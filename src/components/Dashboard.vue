@@ -152,7 +152,7 @@ onMounted(loadDashboardData);
                 <UsersIcon class="h-6 w-6 text-purple-600" />
               </div>
               <div>
-                <p class="text-sm text-gray-500 mb-1">Gender Ratio</p>
+                <p class="text-sm text-gray-500 mb-1">Test</p>
                 <h3 class="text-2xl font-semibold">
                   {{ ((stats.genderDistribution.male / stats.totalStudents) * 100).toFixed(1) }}% M
                 </h3>

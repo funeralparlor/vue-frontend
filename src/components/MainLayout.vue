@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router'; // Import useRouter
 import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue';
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline';
+import api from '@/services/api';
 
 // Props to receive page title
 const props = defineProps({
@@ -12,8 +13,21 @@ const props = defineProps({
   }
 });
 
-// Get current route
+// Get current route and router
 const route = useRoute();
+const router = useRouter();
+
+// Logout function
+const logout = async () => {
+  try {
+    await api.post('/logout'); // Call the logout endpoint
+    localStorage.removeItem('token'); // Remove the token from localStorage
+    router.push({ name: 'login' }); // Redirect to the login page
+  } catch (error) {
+    console.error('Logout failed:', error);
+    alert('Logout failed. Please try again.');
+  }
+};
 
 // User data
 const user = {
@@ -39,10 +53,11 @@ const navigation = computed(() => {
   }));
 });
 
+// User navigation with logout action
 const userNavigation = [
   { name: 'Your Profile', href: '#' },
   { name: 'Settings', href: '#' },
-  { name: 'Sign out', href: '#' },
+  { name: 'Sign out', action: logout }, // Add logout action
 ];
 </script>
 
@@ -67,9 +82,20 @@ const userNavigation = [
               </MenuButton>
               <MenuItems class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                 <MenuItem v-for="item in userNavigation" :key="item.name" v-slot="{ active }">
-                  <a :href="item.href" :class="[active ? 'bg-gray-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                  <a 
+                    v-if="item.href" 
+                    :href="item.href" 
+                    :class="[active ? 'bg-gray-100' : '', 'block px-4 py-2 text-sm text-gray-700']"
+                  >
                     {{ item.name }}
                   </a>
+                  <button
+                    v-else
+                    @click="item.action" 
+                    :class="[active ? 'bg-gray-100' : '', 'block w-full text-left px-4 py-2 text-sm text-gray-700']"
+                  >
+                    {{ item.name }}
+                  </button>
                 </MenuItem>
               </MenuItems>
             </Menu>
@@ -136,9 +162,20 @@ const userNavigation = [
             </MenuButton>
             <MenuItems class="absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none">
               <MenuItem v-for="item in userNavigation" :key="item.name" v-slot="{ active }">
-                <a :href="item.href" :class="[active ? 'bg-gray-50' : '', 'block px-3 py-1 text-sm leading-6 text-gray-900']">
+                <a 
+                  v-if="item.href" 
+                  :href="item.href" 
+                  :class="[active ? 'bg-gray-50' : '', 'block px-3 py-1 text-sm leading-6 text-gray-900']"
+                >
                   {{ item.name }}
                 </a>
+                <button
+                  v-else
+                  @click="item.action" 
+                  :class="[active ? 'bg-gray-50' : '', 'block w-full text-left px-3 py-1 text-sm leading-6 text-gray-900']"
+                >
+                  {{ item.name }}
+                </button>
               </MenuItem>
             </MenuItems>
           </Menu>

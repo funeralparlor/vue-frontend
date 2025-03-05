@@ -82,7 +82,7 @@ onUnmounted(() => abortController.value.abort());
 </script>
 
 <template>
-  <MainLayout pageTitle="Student List">
+  <MainLayout pageTitle="Add Student">
     <div class="flex flex-col gap-8">
       <div class="flex items-center justify-between">
         <div></div> <!-- Empty div to maintain spacing with flexbox -->

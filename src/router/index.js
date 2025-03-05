@@ -1,35 +1,66 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import StudentsView from '@/views/StudentsView.vue'; // Use @ alias
-import StudentList from '@/components/StudentList.vue'; // Use @ alias
+import StudentsView from '@/views/StudentsView.vue';
+import StudentList from '@/components/StudentList.vue';
 import Dashboard from '@/components/Dashboard.vue';
+import Login from '@/views/Login.vue'; // Add missing import
+import Register from '@/views/Register.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-      {
-          path: '/students',
-          name: 'students',
-          component: StudentsView,
-      },
-      {
-        path: '/home',
-        name: 'home',
-        component: StudentsView,
+    { 
+      path: '/login', 
+      name: 'login',
+      component: Login,
+      meta: { requiresGuest: true } // New meta field
     },
-
+    {
+      path: '/register',
+      name: 'register',
+      component: Register,
+      meta: { requiresGuest: true }
+    },
+    {
+      path: '/students',
+      name: 'students',
+      component: StudentsView,
+      meta: { requiresAuth: true } // Protect this route
+    },
+    {
+      path: '/home',
+      name: 'home',
+      component: StudentsView,
+      meta: { requiresAuth: true }
+    },
     {
       path: '/list',
       name: 'list',
       component: StudentList,
-  },
-  {
-    path: '/dashboard',
-    name: 'Dashboard',
-    component: Dashboard
-  },
-    
-      
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: Dashboard,
+      meta: { requiresAuth: true }
+    },
   ],
+});
+
+// Add navigation guard
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token');
+  
+  // Check if route requires authentication
+  if (to.meta.requiresAuth && !token) {
+    next({ name: 'login' });
+  }
+  // Redirect authenticated users from guest routes
+  else if (to.meta.requiresGuest && token) {
+    next({ name: 'dashboard' }); // Or your preferred redirect route
+  } else {
+    next();
+  }
 });
 
 export default router;
