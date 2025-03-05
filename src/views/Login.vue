@@ -121,6 +121,7 @@ const handleLogin = async () => {
       password: password.value,
     });
     localStorage.setItem('token', response.data.token);
+    
     router.push({ name: 'dashboard' });
   } catch (error) {
     console.error('Login failed:', error);
