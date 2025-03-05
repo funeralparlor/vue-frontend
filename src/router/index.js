@@ -30,7 +30,7 @@ const router = createRouter({
       path: '/students',
       name: 'students',
       component: StudentsView,
-     meta: { requiresAuth: true }  Protect this route
+     meta: { requiresAuth: true }  //Protect this route
     },
     {
       path: '/home',
