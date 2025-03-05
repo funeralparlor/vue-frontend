@@ -14,6 +14,12 @@ const router = createRouter({
       component: Login,
       meta: { requiresGuest: true } // New meta field
     },
+    { 
+      path: '/login', 
+      name: 'login',
+      component: Login,
+      meta: { requiresGuest: true } // New meta field
+    },
     {
       path: '/register',
       name: 'register',
