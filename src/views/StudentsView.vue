@@ -16,6 +16,7 @@ const isLoading = ref(false);
 const deletingId = ref(null);
 const abortController = ref(new AbortController());
 
+
 // Fetch students with abort controller
 const loadStudents = async () => {
   try {
