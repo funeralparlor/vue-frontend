@@ -9,7 +9,7 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { 
-      path: '/login', 
+      path: '/', 
       name: 'login',
       component: Login,
       meta: { requiresGuest: true } // New meta field
@@ -24,25 +24,25 @@ const router = createRouter({
       path: '/students',
       name: 'students',
       component: StudentsView,
-      meta: { requiresAuth: true } // Protect this route
+     // meta: { requiresAuth: true }  Protect this route
     },
     {
       path: '/home',
       name: 'home',
       component: StudentsView,
-      meta: { requiresAuth: true }
+     // meta: { requiresAuth: true }
     },
     {
       path: '/list',
       name: 'list',
       component: StudentList,
-      meta: { requiresAuth: true }
+      //meta: { requiresAuth: true }
     },
     {
       path: '/dashboard',
       name: 'dashboard',
       component: Dashboard,
-      meta: { requiresAuth: true }
+      //meta: { requiresAuth: true }
     },
   ],
 });
