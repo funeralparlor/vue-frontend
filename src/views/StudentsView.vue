@@ -393,10 +393,12 @@ onUnmounted(() => {
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Last Name</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">First Name</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Middle Name</th>
-              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Semester</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Course</th>
+              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">College</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Campus</th>
-              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Scholarship Type</th>
+              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Year Level</th>
+              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Gender</th>
+              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Student Status</th>
               <th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Actions</th>
             </tr>
           </thead>
@@ -415,10 +417,12 @@ onUnmounted(() => {
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.last_name }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.first_name }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.middle_name || '–' }}</td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.semester }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.course }}</td>
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.college }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.campus }}</td>
-                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.scholarship_type }}</td>
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.year_level }}</td>
+                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.gender }}</td>
+                  <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.student_status }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <button @click="editStudent(student.id)" class="text-blue-600 hover:text-blue-900 mr-4">
                     Edit

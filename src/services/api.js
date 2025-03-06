@@ -1,4 +1,7 @@
+
 import axios from 'axios';
+import { RouterView } from 'vue-router'
+import { ref } from 'vue';
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
@@ -8,6 +11,9 @@ const api = axios.create({
     },
     withCredentials: true // Required for Sanctum cookies
 });
+
+
+
 
 // Request interceptor
 api.interceptors.request.use(config => {
@@ -30,4 +36,8 @@ api.interceptors.response.use(
     }
 );
 
+
+
 export default api;
+
+
