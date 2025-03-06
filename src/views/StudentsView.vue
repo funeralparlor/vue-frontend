@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import api from '../services/api';
 import EditStudentForm from '@/components/EditStudentForm.vue';
 import StudentForm from '@/components/StudentForm.vue';
@@ -15,20 +15,203 @@ const isAddModalOpen = ref(false);
 const isLoading = ref(false);
 const deletingId = ref(null);
 const abortController = ref(new AbortController());
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+const totalPages = ref(0);
+const totalStudents = ref(0);
+const selectedStudents = ref(new Set());
+const availablePageSizes = ref([10, 25, 50, 100]);
+const isLoadingAll = ref(false);
+const allStudents = ref([]);
 
+// Computed properties
+const hasSelections = computed(() => selectedStudents.value.size > 0);
+const allSelected = computed(() => {
+  return students.value && students.value.length > 0 && 
+         selectedStudents.value.size === students.value.length;
+});
 
-// Fetch students with abort controller
+const isShowingAll = computed(() => itemsPerPage.value === 'All');
+
+// Fetch students with pagination
 const loadStudents = async () => {
   try {
     isLoading.value = true;
-    error.value = null;
-    const response = await api.get('/students', { 
-      signal: abortController.value.signal 
+    error.value = null; // Clear any previous errors
+    
+    // Handle "All" option differently - use a reasonable page size
+    const limit = itemsPerPage.value === 'All' ? 100 : itemsPerPage.value;
+    
+    const response = await api.get('/students', {
+      params: {
+        page: currentPage.value,
+        limit: limit
+      },
+      signal: abortController.value.signal
     });
-    students.value = response.data;
+
+    // Handle different API response structures more consistently
+    if (response.data) {
+      // If the API returns data in a nested structure
+      if (response.data.data && Array.isArray(response.data.data)) {
+        students.value = response.data.data;
+        totalStudents.value = response.data.total || 0;
+        totalPages.value = Math.ceil(totalStudents.value / limit);
+      } 
+      // If the API returns data directly as an array
+      else if (Array.isArray(response.data)) {
+        students.value = response.data;
+        totalStudents.value = response.data.length;
+        totalPages.value = Math.ceil(totalStudents.value / limit);
+      }
+      
+      // If showing "All", load all pages
+      if (itemsPerPage.value === 'All' && totalPages.value > 1) {
+        loadAllStudents(totalStudents.value, limit);
+      }
+      
+      // Log the response structure for debugging
+      console.log('API Response:', {
+        structure: response.data,
+        studentsCount: students.value.length,
+        totalStudents: totalStudents.value,
+        currentPage: currentPage.value,
+        totalPages: totalPages.value
+      });
+    }
   } catch (err) {
-    if (err.name === 'AbortError') return;
-    error.value = 'Failed to load students. Please try again later.';
+    if (err.name !== 'AbortError') {
+      console.error('Load students error:', err);
+      error.value = 'Failed to load students';
+    }
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// Load all students by fetching each page
+const loadAllStudents = async (total, pageSize) => {
+  try {
+    isLoadingAll.value = true;
+    allStudents.value = [...students.value]; // Start with the first page we already loaded
+    
+    const totalPagesToLoad = Math.ceil(total / pageSize);
+    console.log(`Loading all ${total} students across ${totalPagesToLoad} pages`);
+    
+    // Load pages 2 to N (we already have page 1)
+    for (let page = 2; page <= totalPagesToLoad; page++) {
+      const response = await api.get('/students', {
+        params: {
+          page: page,
+          limit: pageSize
+        }
+      });
+      
+      if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        allStudents.value = [...allStudents.value, ...response.data.data];
+      } else if (response.data && Array.isArray(response.data)) {
+        allStudents.value = [...allStudents.value, ...response.data];
+      }
+      
+      console.log(`Loaded page ${page}/${totalPagesToLoad}, total students so far: ${allStudents.value.length}`);
+    }
+    
+    // When done loading all pages, replace the current students array
+    students.value = allStudents.value;
+    console.log(`All students loaded: ${students.value.length}`);
+    
+  } catch (err) {
+    console.error('Load all students error:', err);
+    error.value = 'Failed to load all students. Showing partial results.';
+  } finally {
+    isLoadingAll.value = false;
+  }
+};
+
+// Pagination controls
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+    loadStudents();
+  }
+};
+
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+    loadStudents();
+  }
+};
+
+// Handle page size change
+const changePageSize = (size) => {
+  itemsPerPage.value = size;
+  currentPage.value = 1; // Reset to first page when changing page size
+  selectedStudents.value = new Set(); // Clear selections when changing page size
+  loadStudents();
+};
+
+// Selection management
+const toggleStudentSelection = (id) => {
+  if (!id) return; // Safeguard against undefined ids
+  
+  const newSelection = new Set(selectedStudents.value);
+  newSelection.has(id) ? newSelection.delete(id) : newSelection.add(id);
+  selectedStudents.value = newSelection;
+};
+
+const toggleAllStudents = () => {
+  if (!students.value || students.value.length === 0) return;
+  
+  if (!allSelected.value) {
+    // Select all students
+    const newSelection = new Set();
+    students.value.forEach(student => {
+      if (student && student.id) newSelection.add(student.id);
+    });
+    selectedStudents.value = newSelection;
+  } else {
+    // Deselect all
+    selectedStudents.value = new Set();
+  }
+};
+
+// Bulk deletion
+const deleteSelectedStudents = async () => {
+  if (!hasSelections.value) return;
+  
+  const count = selectedStudents.value.size;
+  if (!confirm(`Delete ${count} selected students?`)) return;
+  
+  try {
+    isLoading.value = true;
+    error.value = null;
+    
+    // Convert Set to Array
+    const idsToDelete = Array.from(selectedStudents.value);
+    console.log('Deleting students with IDs:', idsToDelete);
+    
+    // Use POST method instead of DELETE for bulk operations
+    const response = await api.post('/students/bulk-delete', { 
+      ids: idsToDelete 
+    });
+    
+    console.log('Bulk delete response:', response);
+    
+    // Clear selections after successful deletion
+    selectedStudents.value = new Set();
+    
+    // Handle page reset logic
+    if (students.value.length === idsToDelete.length && currentPage.value > 1) {
+      currentPage.value--;
+    }
+    
+    // Reload students to refresh the list
+    await loadStudents();
+    
+  } catch (err) {
+    console.error('Bulk delete error:', err);
+    error.value = `Failed to delete selected students: ${err.message || 'Unknown error'}`;
   } finally {
     isLoading.value = false;
   }
@@ -39,54 +222,126 @@ const closeAddModal = () => isAddModalOpen.value = false;
 const closeEditModal = () => editingStudent.value = null;
 
 // Handle student creation
-const handleStudentCreated = (newStudent) => {
-  students.value.push(newStudent);
+const handleStudentCreated = async (newStudent) => {
   closeAddModal();
+  // Reload the data instead of just pushing
+  await loadStudents();
 };
 
-// Handle student deletion
+// Delete individual student
 const deleteStudent = async (id) => {
-  if (!confirm('Are you sure?')) return;
+  if (!id || !confirm('Are you sure you want to delete this student?')) return;
+  
   try {
     deletingId.value = id;
-    error.value = null;
     await api.delete(`/students/${id}`);
-    students.value = students.value.filter(s => s.id !== id);
+    await loadStudents(); // Reload to maintain pagination state
   } catch (err) {
-    error.value = 'Failed to delete student';
+    console.error('Delete student error:', err);
+    error.value = `Failed to delete student: ${err.message || 'Unknown error'}`;
   } finally {
     deletingId.value = null;
   }
 };
 
 // Handle student update
-const handleUpdate = (updatedStudent) => {
-  const index = students.value.findIndex(s => s.id === updatedStudent.id);
-  if (index !== -1) students.value.splice(index, 1, updatedStudent);
+const handleUpdate = async (updatedStudent) => {
   closeEditModal();
+  // Reload data instead of manually updating the array
+  await loadStudents();
 };
 
 // Fetch student details for editing
 const editStudent = async (id) => {
+  if (!id) return;
+  
   try {
     error.value = null;
+    isLoading.value = true;
     const response = await api.get(`/students/${id}`);
     editingStudent.value = response.data;
   } catch (err) {
+    console.error('Edit student error:', err);
     error.value = 'Failed to load student details';
+  } finally {
+    isLoading.value = false;
   }
 };
 
+// Create a new abort controller when needed
+const resetAbortController = () => {
+  abortController.value = new AbortController();
+};
+
 // Lifecycle hooks
-onMounted(loadStudents);
-onUnmounted(() => abortController.value.abort());
+onMounted(() => {
+  resetAbortController();
+  loadStudents();
+});
+
+onUnmounted(() => {
+  if (abortController.value) {
+    abortController.value.abort();
+  }
+});
 </script>
 
 <template>
   <MainLayout pageTitle="Add Student">
     <div class="flex flex-col gap-8">
+      <!-- Statistics and Control Panel -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
+        <!-- Stats -->
+        <div class="flex flex-col md:flex-row gap-4 md:items-center">
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <h3 class="text-sm font-medium text-gray-500">Total Students</h3>
+            <p class="text-2xl font-bold text-blue-600">{{ totalStudents }}</p>
+          </div>
+          <div class="bg-green-50 p-3 rounded-lg">
+            <h3 class="text-sm font-medium text-gray-500">Selected</h3>
+            <p class="text-2xl font-bold text-green-600">{{ selectedStudents.size }}</p>
+          </div>
+          
+          <!-- Show loading indicator for "All" mode -->
+          <div v-if="isLoadingAll" class="flex items-center text-blue-600">
+            <ArrowPathIcon class="h-4 w-4 animate-spin mr-2" />
+            <span class="text-sm">Loading all students...</span>
+          </div>
+        </div>
+        
+        <!-- Page size selector -->
+        <div class="flex items-center gap-2">
+          <label for="page-size" class="text-sm font-medium text-gray-700">Show:</label>
+          <select 
+            id="page-size" 
+            v-model="itemsPerPage" 
+            @change="changePageSize(itemsPerPage)"
+            class="rounded-md border-gray-300 py-1.5 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          >
+            <option v-for="size in availablePageSizes" :key="size" :value="size">
+              {{ size }} entries
+            </option>
+            <option value="All">All</option>
+          </select>
+        </div>
+      </div>
+      
       <div class="flex items-center justify-between">
-        <div></div> <!-- Empty div to maintain spacing with flexbox -->
+        <div class="flex gap-2">
+          <button 
+            @click="deleteSelectedStudents"
+            :disabled="!hasSelections || isLoading || isLoadingAll"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            <template v-if="isLoading && hasSelections">
+              <ArrowPathIcon class="h-4 w-4 inline-block animate-spin mr-1" />
+              Deleting...
+            </template>
+            <template v-else>
+              Delete Selected ({{ selectedStudents.size }})
+            </template>
+          </button>
+        </div>
         <div class="flex gap-2">
           <button 
             @click="isAddModalOpen = true"
@@ -95,21 +350,19 @@ onUnmounted(() => abortController.value.abort());
             Add Student
           </button>
 
-          <!-- Refresh Button -->
           <button 
             @click="loadStudents" 
-            :disabled="isLoading"
+            :disabled="isLoading || isLoadingAll"
             class="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
           >
-            <ArrowPathIcon class="h-5 w-5 mr-2 animate-spin" v-if="isLoading" />
-            <ArrowPathIcon class="h-5 w-5 mr-2" v-else />
-            Refresh Data
+            <ArrowPathIcon class="h-5 w-5 mr-2" :class="{ 'animate-spin': isLoading }" />
+            Refresh
           </button>
         </div>
       </div>
-            
+
       <!-- Loading and error states -->
-      <div v-if="isLoading" class="text-center p-8">
+      <div v-if="(isLoading || isLoadingAll) && !students.length" class="text-center p-8">
         <div class="h-8 w-8 text-blue-600 mx-auto animate-spin">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -119,15 +372,23 @@ onUnmounted(() => abortController.value.abort());
         <p class="mt-2 text-sm text-gray-600">Loading students...</p>
       </div>
 
-      <div v-else-if="error" class="bg-red-50 p-4 rounded-lg">
+      <div v-if="error" class="bg-red-50 p-4 rounded-lg">
         <p class="text-red-600 text-sm">{{ error }}</p>
       </div>
 
       <!-- Table -->
-      <div v-else class="ring-1 ring-gray-200 rounded-lg bg-white">
+      <div v-if="students.length || (!isLoading && !error)" class="ring-1 ring-gray-200 rounded-lg bg-white overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
+              <th class="w-4 px-4 py-3.5 text-left text-sm font-semibold text-gray-900">
+                <input 
+                  type="checkbox" 
+                  :checked="allSelected"
+                  @change="toggleAllStudents"
+                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                />
+              </th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Student ID</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Last Name</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">First Name</th>
@@ -142,6 +403,14 @@ onUnmounted(() => abortController.value.abort());
           <tbody class="divide-y divide-gray-200">
             <template v-if="students.length">
               <tr v-for="student in students" :key="student.id" class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-4">
+                  <input 
+                    type="checkbox" 
+                    :checked="selectedStudents.has(student.id)"
+                    @change="toggleStudentSelection(student.id)"
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                  />
+                </td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">{{ student.student_id }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.last_name }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.first_name }}</td>
@@ -155,32 +424,60 @@ onUnmounted(() => abortController.value.abort());
                     Edit
                   </button>
                   <button 
-          @click="deleteStudent(student.id)" 
-          :disabled="deletingId === student.id"
-          class="text-red-600 hover:text-red-900 disabled:opacity-50"
-        >
-          <template v-if="deletingId === student.id">
-            <ArrowPathIcon class="h-4 w-4 inline-block animate-spin mr-1" />
-            Deleting...
-          </template>
-          <template v-else>Delete</template>
-        </button>
+                    @click="deleteStudent(student.id)" 
+                    :disabled="deletingId === student.id"
+                    class="text-red-600 hover:text-red-900 disabled:opacity-50"
+                  >
+                    <template v-if="deletingId === student.id">
+                      <ArrowPathIcon class="h-4 w-4 inline-block animate-spin mr-1" />
+                      Deleting...
+                    </template>
+                    <template v-else>Delete</template>
+                  </button>
                 </td>
               </tr>
             </template>
             <tr v-else>
-              <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500">
+              <td colspan="10" class="px-6 py-8 text-center text-sm text-gray-500">
                 No students found
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
 
-    <!-- Add Student Modal -->
-    <!-- Enhanced Add Student Modal -->
-    <Dialog :open="isAddModalOpen" @close="closeAddModal" class="relative z-50">
+      <!-- Pagination controls -->
+      <div v-if="totalPages > 0" class="flex justify-between items-center mt-4">
+        <div class="text-sm text-gray-700">
+          <span v-if="!isShowingAll">
+            Showing {{ (currentPage - 1) * itemsPerPage + 1 }} 
+            to {{ Math.min(currentPage * itemsPerPage, totalStudents) }} 
+            of {{ totalStudents }} students
+          </span>
+          <span v-else>
+            Showing all {{ students.length }} of {{ totalStudents }} students
+          </span>
+        </div>
+        <div class="flex gap-2">
+          <button 
+            @click="prevPage" 
+            :disabled="currentPage === 1 || isLoading || isLoadingAll || isShowingAll"
+            class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <button 
+            @click="nextPage" 
+            :disabled="currentPage === totalPages || isLoading || isLoadingAll || isShowingAll"
+            class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <!-- Add Student Modal -->
+      <Dialog :open="isAddModalOpen" @close="closeAddModal" class="relative z-50">
         <div class="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div class="fixed inset-0 flex items-center justify-center p-4">
           <DialogPanel class="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
@@ -201,27 +498,29 @@ onUnmounted(() => abortController.value.abort());
         </div>
       </Dialog>
 
-    <!-- Edit Student Modal -->
-    <Dialog :open="!!editingStudent" @close="editingStudent = null" class="relative z-50">
-      <div class="fixed inset-0 bg-black/30" aria-hidden="true" />
-      <div class="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel class="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-          <div class="flex justify-between items-center mb-4">
-            <DialogTitle class="text-lg font-semibold">Edit Student</DialogTitle>
-            <button 
-              @click="editingStudent = null"
-              class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-            >
-              <XMarkIcon class="h-5 w-5" />
-            </button>
-          </div>
-          <EditStudentForm 
-            :student="editingStudent" 
-            @studentUpdated="handleUpdate"
-            @cancel="editingStudent = null"
-          />
-        </DialogPanel>
-      </div>
-    </Dialog>
+      <!-- Edit Student Modal -->
+      <Dialog :open="!!editingStudent" @close="closeEditModal" class="relative z-50">
+        <div class="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+          <DialogPanel class="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+              <DialogTitle class="text-lg font-semibold">Edit Student</DialogTitle>
+              <button 
+                @click="closeEditModal"
+                class="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
+              >
+                <XMarkIcon class="h-5 w-5" />
+              </button>
+            </div>
+            <EditStudentForm 
+              v-if="editingStudent"
+              :student="editingStudent" 
+              @studentUpdated="handleUpdate"
+              @cancel="closeEditModal"
+            />
+          </DialogPanel>
+        </div>
+      </Dialog>
+    </div>
   </MainLayout>
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import api from '../services/api';
 import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue';
 import { Bars3Icon, XMarkIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline';
@@ -9,7 +9,6 @@ import MainLayout from '@/components/MainLayout.vue';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { ChevronDownIcon, XCircleIcon, CheckIcon } from '@heroicons/vue/24/outline';
-
 
 // Reactive state
 const filterSemester = ref([]);
@@ -21,6 +20,7 @@ const dropdownStates = ref({
   course: false,
   campus: false,
   scholarshipType: false,
+  perPage: false,
 });
 
 const selectedCountLabels = computed(() => ({
@@ -36,14 +36,78 @@ const isLoading = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
+const totalStudents = ref(0);
+const totalPages = ref(1);
+const selectedStudents = ref([]);
+const selectAll = ref(false);
 
+// New: Display options for items per page
+const perPageOptions = [
+  { value: 10, label: '10 per page' },
+  { value: 25, label: '25 per page' },
+  { value: 50, label: '50 per page' },
+  { value: 100, label: '100 per page' },
+  { value: 10000, label: 'All' },
+];
 
+// Toggle selection for all students
+const toggleSelectAll = () => {
+  if (selectAll.value) {
+    // Select all students on the current page
+    selectedStudents.value = paginatedStudents.value.map(student => student.id);
+  } else {
+    selectedStudents.value = [];
+  }
+};
 
+// Watch for changes to the selectAll state
+watch(selectAll, toggleSelectAll);
 
-///drop down
+// Toggle selection for individual student
+const toggleSelectStudent = (studentId) => {
+  const index = selectedStudents.value.indexOf(studentId);
+  if (index === -1) {
+    selectedStudents.value.push(studentId);
+  } else {
+    selectedStudents.value.splice(index, 1);
+  }
+};
+
+// Check if a student is selected
+const isStudentSelected = (studentId) => {
+  return selectedStudents.value.includes(studentId);
+};
+
+// Watch for changes to pagination to reset selectAll
+watch([currentPage, itemsPerPage], () => {
+  selectAll.value = false;
+  selectedStudents.value = [];
+});
+
+// Dropdown
 const toggleDropdown = (filterType) => {
+  // Close all other dropdowns first
+  Object.keys(dropdownStates.value).forEach(key => {
+    if (key !== filterType) {
+      dropdownStates.value[key] = false;
+    }
+  });
   dropdownStates.value[filterType] = !dropdownStates.value[filterType];
 };
+
+// Close dropdowns when clicking outside
+const closeDropdowns = (event) => {
+  if (!event.target.closest('.filter-dropdown-container')) {
+    Object.keys(dropdownStates.value).forEach(key => {
+      dropdownStates.value[key] = false;
+    });
+  }
+};
+
+// Add event listener for closing dropdowns
+onMounted(() => {
+  document.addEventListener('click', closeDropdowns);
+});
 
 const toggleFilter = (filterType, value) => {
   const filterRef = {
@@ -78,8 +142,9 @@ const clearFilters = () => {
   filterScholarshipType.value = [];
   searchQuery.value = '';
   currentPage.value = 1;
+  selectedStudents.value = [];
+  selectAll.value = false;
 };
-
 
 // User and navigation data
 const user = {
@@ -110,56 +175,97 @@ const filterOptions = computed(() => ({
   scholarshipType: [...new Set(students.value.map(s => s.scholarship_type))].sort(),
 }));
 
-const filteredStudents = computed(() => {
-  return students.value.filter(student => {
-    const matchesFilters = (
-      (filterSemester.value.length === 0 || filterSemester.value.includes(student.semester)) &&
-      (filterCourse.value.length === 0 || filterCourse.value.includes(student.course)) &&
-      (filterCampus.value.length === 0 || filterCampus.value.includes(student.campus)) &&
-      (filterScholarshipType.value.length === 0 || filterScholarshipType.value.includes(student.scholarship_type))
-    );
-
-    const matchesSearch = searchQuery.value
-      ? student.student_id.toLowerCase().includes(searchQuery.value.toLowerCase())
-      : true;
-
-    return matchesFilters && matchesSearch;
-  });
-});
-
+// Using the data returned from the API
 const paginatedStudents = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value;
-  const end = start + itemsPerPage.value;
-  return filteredStudents.value.slice(start, end);
+  return students.value;
 });
 
-const totalPages = computed(() => {
-  return Math.max(1, Math.ceil(filteredStudents.value.length / itemsPerPage.value));
+// Add filteredStudents computed property to fix template references
+const filteredStudents = computed(() => {
+  return students.value;
 });
+
+// Change per page selection
+const changeItemsPerPage = (value) => {
+  itemsPerPage.value = value;
+  currentPage.value = 1;
+  loadStudents();
+  dropdownStates.value.perPage = false;
+};
 
 // Actions
-
-
 const loadStudents = async () => {
   try {
     isLoading.value = true;
     error.value = null;
-    const response = await api.get('/students');
-    students.value = response.data;
+
+    // Prepare query parameters for API request
+    const params = {
+      // Always send page, but set to 1 when showing all
+      page: itemsPerPage.value === -1 ? 1 : currentPage.value,
+      // Only send limit if it's not -1 (All)
+      ...(itemsPerPage.value !== -1 && { limit: itemsPerPage.value }),
+      search: searchQuery.value || undefined,
+    };
+
+    // Add filter parameters if they exist
+    if (filterSemester.value.length > 0) {
+      params.semester = filterSemester.value;
+    }
+    if (filterCourse.value.length > 0) {
+      params.course = filterCourse.value;
+    }
+    if (filterCampus.value.length > 0) {
+      params.campus = filterCampus.value;
+    }
+    if (filterScholarshipType.value.length > 0) {
+      params.scholarship_type = filterScholarshipType.value;
+    }
+
+    // Make the API request
+    const response = await api.get('/students', { params });
+
+    // Update the state with the response data
+    students.value = response.data.data;
+    currentPage.value = response.data.page;
+    totalPages.value = response.data.pages;
+    totalStudents.value = response.data.total;
+
+    // Reset selection state
+    selectAll.value = false;
+    selectedStudents.value = [];
+
   } catch (err) {
+    // Handle errors
     error.value = 'Failed to load students. Please try again later.';
+    console.error('Error loading students:', err);
+
+    // Clear the students list on error
+    students.value = [];
+    totalStudents.value = 0;
+    totalPages.value = 1;
+    currentPage.value = 1;
+
   } finally {
+    // Always set loading to false
     isLoading.value = false;
   }
 };
 
+// Watch for changes to filters to reload data
+watch([filterSemester, filterCourse, filterCampus, filterScholarshipType, searchQuery], () => {
+  currentPage.value = 1;
+  loadStudents();
+});
+
 const changePage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPage.value = page;
+    loadStudents();
   }
 };
 
-// Define filter refs mapping for dynamic binding
+// Filter refs mapping for dynamic binding
 const filterRefs = {
   semester: filterSemester,
   course: filterCourse,
@@ -167,10 +273,47 @@ const filterRefs = {
   scholarshipType: filterScholarshipType
 };
 
+// Get only the selected students or all if none selected
+const getExportData = () => {
+  if (selectedStudents.value.length === 0) {
+    return students.value;
+  }
+  return students.value.filter(student => selectedStudents.value.includes(student.id));
+};
 
 // Enhanced Excel Export
-const exportToExcel = () => {
-  const data = filteredStudents.value.map(student => ({
+const exportToExcel = async () => {
+  // If we have selected students but they're not on the current page, we need to fetch them
+  let exportData = getExportData();
+  
+  // If no students are selected and we want to export all filtered students
+  if (selectedStudents.value.length === 0 && itemsPerPage.value !== -1) {
+    try {
+      isLoading.value = true;
+      
+      // Prepare query parameters to get all filtered students
+      const params = {
+        limit: -1, // Get all students matching filters
+        search: searchQuery.value || undefined,
+      };
+      
+      if (filterSemester.value.length > 0) params.semester = filterSemester.value;
+      if (filterCourse.value.length > 0) params.course = filterCourse.value;
+      if (filterCampus.value.length > 0) params.campus = filterCampus.value;
+      if (filterScholarshipType.value.length > 0) params.scholarship_type = filterScholarshipType.value;
+      
+      const response = await api.get('/students', { params });
+      exportData = response.data.data;
+    } catch (err) {
+      error.value = 'Failed to export data. Please try again later.';
+      console.error(err);
+      return;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  const data = exportData.map(student => ({
     'Student ID': student.student_id,
     'Last Name': student.last_name,
     'First Name': student.first_name,
@@ -209,12 +352,60 @@ const exportToExcel = () => {
   worksheet['!autofilter'] = { ref: worksheet['!ref'] };
   worksheet['!freeze'] = { ySplit: 1 };
   
+  // Add export info
+  const selectionInfo = selectedStudents.value.length > 0 
+    ? `Selected: ${selectedStudents.value.length} students` 
+    : `All: ${exportData.length} students`;
+
+  const infoSheet = xlsxUtils.aoa_to_sheet([
+    ["Export Date:", new Date().toLocaleString()],
+    ["Filters Applied:", ""],
+    ["Semester:", filterSemester.value.join(", ") || "All"],
+    ["Course:", filterCourse.value.join(", ") || "All"],
+    ["Campus:", filterCampus.value.join(", ") || "All"],
+    ["Scholarship Type:", filterScholarshipType.value.join(", ") || "All"],
+    ["Search Query:", searchQuery.value || "None"],
+    ["Selection:", selectionInfo]
+  ]);
+  
+  xlsxUtils.book_append_sheet(workbook, infoSheet, 'Export Info');
   xlsxUtils.book_append_sheet(workbook, worksheet, 'Students');
+  
   writeXLSXFile(workbook, `students_export_${new Date().toISOString()}.xlsx`);
 };
 
 // Enhanced PDF Export
-const exportToPDF = () => {
+const exportToPDF = async () => {
+  // If we have selected students but they're not on the current page, we need to fetch them
+  let exportData = getExportData();
+  
+  // If no students are selected and we want to export all filtered students
+  if (selectedStudents.value.length === 0 && itemsPerPage.value !== -1) {
+    try {
+      isLoading.value = true;
+      
+      // Prepare query parameters to get all filtered students
+      const params = {
+        limit: -1, // Get all students matching filters
+        search: searchQuery.value || undefined,
+      };
+      
+      if (filterSemester.value.length > 0) params.semester = filterSemester.value;
+      if (filterCourse.value.length > 0) params.course = filterCourse.value;
+      if (filterCampus.value.length > 0) params.campus = filterCampus.value;
+      if (filterScholarshipType.value.length > 0) params.scholarship_type = filterScholarshipType.value;
+      
+      const response = await api.get('/students', { params });
+      exportData = response.data.data;
+    } catch (err) {
+      error.value = 'Failed to export data. Please try again later.';
+      console.error(err);
+      return;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
@@ -225,6 +416,19 @@ const exportToPDF = () => {
   const logo = new Image();
   logo.src = user.imageUrl;
   doc.addImage(logo, 'PNG', 15, 10, 15, 15);
+
+  // Define column widths
+  const columnStyles = {
+    0: { cellWidth: 20 }, // Student ID
+    1: { cellWidth: 30 }, // Last Name
+    2: { cellWidth: 30 }, // First Name
+    3: { cellWidth: 30 }, // Middle Name
+    4: { cellWidth: 20 }, // Semester
+    5: { cellWidth: 40 }, // Course
+    6: { cellWidth: 35 }, // Campus
+    7: { cellWidth: 35 }, // Scholarship Type
+  };
+
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
@@ -233,18 +437,24 @@ const exportToPDF = () => {
   doc.setTextColor(100);
   doc.text(`Exported: ${new Date().toLocaleString()}`, 15, 30);
 
+  // Selection information
+  const selectionInfo = selectedStudents.value.length > 0 
+    ? `Selected: ${selectedStudents.value.length} of ${totalStudents.value} students` 
+    : `All filtered: ${exportData.length} students`;
+  doc.text(selectionInfo, 15, 35);
+
   // Filter information
   const filters = [
-  filterSemester.value.length > 0 && `Semester: ${filterSemester.value.join(', ')}`,
-  filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
-  filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
-  filterScholarshipType.value.length > 0 && `Scholarship: ${filterScholarshipType.value.join(', ')}`,
-  searchQuery.value && `Search: ${searchQuery.value}`
-].filter(Boolean).join('  •  ');
+    filterSemester.value.length > 0 && `Semester: ${filterSemester.value.join(', ')}`,
+    filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
+    filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
+    filterScholarshipType.value.length > 0 && `Scholarship: ${filterScholarshipType.value.join(', ')}`,
+    searchQuery.value && `Search: ${searchQuery.value}`
+  ].filter(Boolean).join('  •  ');
 
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(50);
-  doc.text(filters, 15, 38);
+  doc.text(filters, 15, 40);
 
   // Table configuration
   const headers = [
@@ -262,7 +472,7 @@ const exportToPDF = () => {
     halign: 'center'
   }));
 
-  const data = filteredStudents.value.map(student => ({
+  const data = exportData.map(student => ({
     ...student,
     'Student ID': student.student_id || '-',
     'Last Name': student.last_name || '-',
@@ -331,6 +541,7 @@ const preloadLogo = () => {
   const img = new Image();
   img.src = user.imageUrl;
 };
+
 onMounted(() => {
   loadStudents();
   preloadLogo();
@@ -338,419 +549,500 @@ onMounted(() => {
 </script>
 
 <template>
- <MainLayout pageTitle="Student List">
-   
-      <!-- Content area -->
-      <div class="flex flex-col gap-8">
-        <!-- Header and filters -->
-        <div class="mb-8">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-    <div class="flex items-center justify-between">
-      <div class="flex gap-2">
-        <button 
-          @click="exportToExcel"
-          class="btn-export flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
-        >
-          <span class="hidden sm:inline">Export Excel</span>
-          <DocumentArrowDownIcon class="h-5 w-5" />
-        </button>
-        <button 
-          @click="exportToPDF"
-          class="btn-export flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700"
-        >
-          <span class="hidden sm:inline">Export PDF</span>
-          <DocumentTextIcon class="h-5 w-5" />
-        </button>
-      </div>
-      <button 
-        @click="loadStudents"
-        class="btn-refresh flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-      >
-        <ArrowPathIcon class="h-4 w-4" />
-        Refresh Data
-      </button>
-    </div>
-  </div>
-
-
-
-  
-
-          <!-- Filter controls -->
-<div class="bg-white p-6 rounded-lg shadow-sm ring-1 ring-gray-200">
-  <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-    <!-- Search by Student ID -->
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-2">Search by Student ID</label>
-      <div class="relative">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Enter Student ID"
-          class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm pl-10"
-        />
-        <MagnifyingGlassIcon class="h-4 w-4 text-gray-400 absolute left-3 top-2.5" />
-      </div>
-    </div>
-
-             
-
-           
-
-
-            <!-- Multi-select dropdown for Semester -->
-    <div class="filter-dropdown-container relative">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Semester</label>
-      <button 
-        @click.stop="toggleDropdown('semester')"
-        class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-      >
-        <span class="truncate">{{ selectedCountLabels.semester }}</span>
-        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
-      </button>
-      <div 
-        v-if="dropdownStates.semester"
-        class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
-      >
-        <div class="p-2 border-b">
-          <div class="mb-2 text-xs text-gray-500">
-            {{ filterSemester.length }} of {{ filterOptions.semester.length }} selected
+  <MainLayout pageTitle="Student List">
+    <!-- Content area -->
+    <div class="flex flex-col gap-8">
+      <!-- Stats & Page Size Selector -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-4 rounded-lg shadow-sm">
+        <!-- Stats -->
+        <div class="flex flex-col md:flex-row gap-4 md:items-center">
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <h3 class="text-sm font-medium text-gray-500">Total Students</h3>
+            <p class="text-2xl font-bold text-blue-600">{{ totalStudents }}</p>
           </div>
-          <div class="flex flex-wrap gap-1 mt-1">
+          <div class="bg-green-50 p-3 rounded-lg">
+            <h3 class="text-sm font-medium text-gray-500">Selected</h3>
+            <p class="text-2xl font-bold text-green-600">{{ selectedStudents.length }}</p>
+          </div>
+          
+          <!-- Loading indicator for "All" mode -->
+          <div v-if="isLoading && itemsPerPage === -1" class="flex items-center text-blue-600">
+            <ArrowPathIcon class="h-4 w-4 animate-spin mr-2" />
+            <span class="text-sm">Loading all students...</span>
+          </div>
+        </div>
+        
+        <!-- Page size selector -->
+        <div class="filter-dropdown-container relative">
+          <label class="text-sm font-medium text-gray-700 mr-2">Show:</label>
+          <button 
+            @click.stop="toggleDropdown('perPage')"
+            class="flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <span>{{ itemsPerPage === 10000 ? 'All' : `${itemsPerPage} per page` }}</span>
+            <ChevronDownIcon class="h-4 w-4 ml-2 text-gray-400" />
+          </button>
+          <div 
+            v-if="dropdownStates.perPage"
+            class="absolute z-10 right-0 mt-1 w-40 bg-white shadow-lg rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+          >
+            <div 
+              v-for="option in perPageOptions" 
+              :key="option.value"
+              @click.stop="changeItemsPerPage(option.value)"
+              class="px-3 py-2 cursor-pointer hover:bg-gray-100"
+            >
+              {{ option.label }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions & Export -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div class="flex items-center gap-4">
+          <button 
+            @click="exportToExcel"
+            class="btn-export flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 px-3 py-2 rounded-md border border-green-200 hover:bg-green-100"
+          >
+            <DocumentArrowDownIcon class="h-5 w-5" />
+            <span class="hidden sm:inline">Export Excel</span>
+          </button>
+          <button 
+            @click="exportToPDF"
+            class="btn-export flex items-center gap-2 text-sm font-medium text-red-700 bg-red-50 px-3 py-2 rounded-md border border-red-200 hover:bg-red-100"
+          >
+            <DocumentTextIcon class="h-5 w-5" />
+            <span class="hidden sm:inline">Export PDF</span>
+          </button>
+        </div>
+        <button 
+          @click="loadStudents"
+          class="flex items-center gap-2 text-sm font-medium text-blue-700 bg-blue-50 px-3 py-2 rounded-md border border-blue-200 hover:bg-blue-100 mt-2 sm:mt-0"
+        >
+          <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
+          {{ isLoading ? 'Loading...' : 'Refresh Data' }}
+        </button>
+      </div>
+
+      <!-- Filter controls -->
+      <div class="bg-white p-6 rounded-lg shadow-sm ring-1 ring-gray-200">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <!-- Search by Student ID -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Search by Student ID</label>
+            <div class="relative">
+              <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="Enter Student ID"
+                class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm pl-10"
+              />
+              <MagnifyingGlassIcon class="h-4 w-4 text-gray-400 absolute left-3 top-2.5" />
+            </div>
+          </div>
+
+          <!-- Multi-select dropdown for Semester -->
+          <div class="filter-dropdown-container relative">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+            <button 
+              @click.stop="toggleDropdown('semester')"
+              class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <span class="truncate">{{ selectedCountLabels.semester }}</span>
+              <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+            </button>
+            <div 
+              v-if="dropdownStates.semester"
+              class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+            >
+              <div class="p-2 border-b">
+                <div class="mb-2 text-xs text-gray-500">
+                  {{ filterSemester.length }} of {{ filterOptions.semester.length }} selected
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div 
+                    v-for="value in filterSemester" 
+                    :key="value"
+                    class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    <span>{{ value }}</span>
+                    <button @click.stop="removeFilter('semester', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                      <XCircleIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div 
+                v-for="option in filterOptions.semester" 
+                :key="option"
+                @click.stop="toggleFilter('semester', option)"
+                class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
+              >
+                <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterSemester.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
+                  <CheckIcon v-if="filterSemester.includes(option)" class="h-3 w-3 text-white" />
+                </div>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-select dropdown for Course -->
+          <div class="filter-dropdown-container relative">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Course</label>
+            <button 
+              @click.stop="toggleDropdown('course')"
+              class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <span class="truncate">{{ selectedCountLabels.course }}</span>
+              <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+            </button>
+            <div 
+              v-if="dropdownStates.course"
+              class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+            >
+              <div class="p-2 border-b">
+                <div class="mb-2 text-xs text-gray-500">
+                  {{ filterCourse.length }} of {{ filterOptions.course.length }} selected
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div 
+                    v-for="value in filterCourse" 
+                    :key="value"
+                    class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    <span>{{ value }}</span>
+                    <button @click.stop="removeFilter('course', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                      <XCircleIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div 
+                v-for="option in filterOptions.course" 
+                :key="option"
+                @click.stop="toggleFilter('course', option)"
+                class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
+              >
+                <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterCourse.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
+                  <CheckIcon v-if="filterCourse.includes(option)" class="h-3 w-3 text-white" />
+                </div>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-select dropdown for Campus -->
+          <div class="filter-dropdown-container relative">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Campus</label>
+            <button 
+              @click.stop="toggleDropdown('campus')"
+              class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <span class="truncate">{{ selectedCountLabels.campus }}</span>
+              <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+            </button>
+            <div 
+              v-if="dropdownStates.campus"
+              class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+            >
+              <div class="p-2 border-b">
+                <div class="mb-2 text-xs text-gray-500">
+                  {{ filterCampus.length }} of {{ filterOptions.campus.length }} selected
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div 
+                    v-for="value in filterCampus" 
+                    :key="value"
+                    class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    <span>{{ value }}</span>
+                    <button @click.stop="removeFilter('campus', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                      <XCircleIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div 
+                v-for="option in filterOptions.campus" 
+                :key="option"
+                @click.stop="toggleFilter('campus', option)"
+                class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
+              >
+                <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterCampus.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
+                  <CheckIcon v-if="filterCampus.includes(option)" class="h-3 w-3 text-white" />
+                </div>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Multi-select dropdown for Scholarship Type -->
+          <div class="filter-dropdown-container relative">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Scholarship Type</label>
+            <button 
+              @click.stop="toggleDropdown('scholarshipType')"
+              class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <span class="truncate">{{ selectedCountLabels.scholarshipType }}</span>
+              <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+            </button>
+            <div 
+              v-if="dropdownStates.scholarshipType"
+              class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+            >
+              <div class="p-2 border-b">
+                <div class="mb-2 text-xs text-gray-500">
+                  {{ filterScholarshipType.length }} of {{ filterOptions.scholarshipType.length }} selected
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div 
+                    v-for="value in filterScholarshipType" 
+                    :key="value"
+                    class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    <span>{{ value }}</span>
+                    <button @click.stop="removeFilter('scholarshipType', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                      <XCircleIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div 
+                v-for="option in filterOptions.scholarshipType" 
+                :key="option"
+                @click.stop="toggleFilter('scholarshipType', option)"
+                class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
+              >
+                <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterScholarshipType.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
+                  <CheckIcon v-if="filterScholarshipType.includes(option)" class="h-3 w-3 text-white" />
+                </div>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active filter tags -->
+        <div v-if="filterSemester.length || filterCourse.length || filterCampus.length || filterScholarshipType.length" class="mt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Active Filters:</h3>
+          <div class="flex flex-wrap gap-2">
             <div 
               v-for="value in filterSemester" 
-              :key="value"
+              :key="`sem-${value}`"
               class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
             >
-              <span>{{ value }}</span>
-              <button @click.stop="removeFilter('semester', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+              <span>Semester: {{ value }}</span>
+              <button @click="removeFilter('semester', value)" class="ml-1 text-blue-600 hover:text-blue-800">
                 <XCircleIcon class="h-3 w-3" />
               </button>
             </div>
-          </div>
-        </div>
-        <div 
-          v-for="option in filterOptions.semester" 
-          :key="option"
-          @click.stop="toggleFilter('semester', option)"
-          class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
-        >
-          <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterSemester.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
-            <CheckIcon v-if="filterSemester.includes(option)" class="h-3 w-3 text-white" />
-          </div>
-          <span>{{ option }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Multi-select dropdown for Course -->
-    <div class="filter-dropdown-container relative">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Course</label>
-      <button 
-        @click.stop="toggleDropdown('course')"
-        class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-      >
-        <span class="truncate">{{ selectedCountLabels.course }}</span>
-        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
-      </button>
-      <div 
-        v-if="dropdownStates.course"
-        class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
-      >
-        <div class="p-2 border-b">
-          <div class="mb-2 text-xs text-gray-500">
-            {{ filterCourse.length }} of {{ filterOptions.course.length }} selected
-          </div>
-          <div class="flex flex-wrap gap-1 mt-1">
             <div 
               v-for="value in filterCourse" 
-              :key="value"
+              :key="`course-${value}`"
               class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
             >
-              <span>{{ value }}</span>
-              <button @click.stop="removeFilter('course', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+              <span>Course: {{ value }}</span>
+              <button @click="removeFilter('course', value)" class="ml-1 text-blue-600 hover:text-blue-800">
                 <XCircleIcon class="h-3 w-3" />
               </button>
             </div>
-          </div>
-        </div>
-        <div 
-          v-for="option in filterOptions.course" 
-          :key="option"
-          @click.stop="toggleFilter('course', option)"
-          class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
-        >
-          <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterCourse.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
-            <CheckIcon v-if="filterCourse.includes(option)" class="h-3 w-3 text-white" />
-          </div>
-          <span>{{ option }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Multi-select dropdown for Campus -->
-    <div class="filter-dropdown-container relative">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Campus</label>
-      <button 
-        @click.stop="toggleDropdown('campus')"
-        class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-      >
-        <span class="truncate">{{ selectedCountLabels.campus }}</span>
-        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
-      </button>
-      <div 
-        v-if="dropdownStates.campus"
-        class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
-      >
-        <div class="p-2 border-b">
-          <div class="mb-2 text-xs text-gray-500">
-            {{ filterCampus.length }} of {{ filterOptions.campus.length }} selected
-          </div>
-          <div class="flex flex-wrap gap-1 mt-1">
             <div 
               v-for="value in filterCampus" 
-              :key="value"
+              :key="`campus-${value}`"
               class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
             >
-              <span>{{ value }}</span>
-              <button @click.stop="removeFilter('campus', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+              <span>Campus: {{ value }}</span>
+              <button @click="removeFilter('campus', value)" class="ml-1 text-blue-600 hover:text-blue-800">
                 <XCircleIcon class="h-3 w-3" />
               </button>
             </div>
-          </div>
-        </div>
-        <div 
-          v-for="option in filterOptions.campus" 
-          :key="option"
-          @click.stop="toggleFilter('campus', option)"
-          class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
-        >
-          <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterCampus.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
-            <CheckIcon v-if="filterCampus.includes(option)" class="h-3 w-3 text-white" />
-          </div>
-          <span>{{ option }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Multi-select dropdown for Scholarship Type -->
-    <div class="filter-dropdown-container relative">
-      <label class="block text-sm font-medium text-gray-700 mb-2">Scholarship Type</label>
-      <button 
-        @click.stop="toggleDropdown('scholarshipType')"
-        class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-      >
-        <span class="truncate">{{ selectedCountLabels.scholarshipType }}</span>
-        <ChevronDownIcon class="h-4 w-4 text-gray-400" />
-      </button>
-      <div 
-        v-if="dropdownStates.scholarshipType"
-        class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
-      >
-        <div class="p-2 border-b">
-          <div class="mb-2 text-xs text-gray-500">
-            {{ filterScholarshipType.length }} of {{ filterOptions.scholarshipType.length }} selected
-          </div>
-          <div class="flex flex-wrap gap-1 mt-1">
             <div 
               v-for="value in filterScholarshipType" 
-              :key="value"
+              :key="`schol-${value}`"
               class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
             >
-              <span>{{ value }}</span>
-              <button @click.stop="removeFilter('scholarshipType', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+              <span>Scholarship: {{ value }}</span>
+              <button @click="removeFilter('scholarshipType', value)" class="ml-1 text-blue-600 hover:text-blue-800">
                 <XCircleIcon class="h-3 w-3" />
               </button>
             </div>
           </div>
         </div>
-        <div 
-          v-for="option in filterOptions.scholarshipType" 
-          :key="option"
-          @click.stop="toggleFilter('scholarshipType', option)"
-          class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
-        >
-          <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterScholarshipType.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
-            <CheckIcon v-if="filterScholarshipType.includes(option)" class="h-3 w-3 text-white" />
-          </div>
-          <span>{{ option }}</span>
+
+        <div class="mt-4 flex justify-between items-center">
+          <span class="text-sm text-gray-500">
+            Showing {{ filteredStudents.length }} of {{ totalStudents }} results
+          </span>
+          <button 
+            @click="clearFilters"
+            class="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 px-3 py-1.5 rounded-md hover:bg-gray-200"
+          >
+            <XMarkIcon class="h-4 w-4" />
+            Clear Filters
+          </button>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Active filter tags -->
-  <div v-if="filterSemester.length || filterCourse.length || filterCampus.length || filterScholarshipType.length" class="mt-4">
-    <h3 class="text-sm font-medium text-gray-700 mb-2">Active Filters:</h3>
-    <div class="flex flex-wrap gap-2">
-      <div 
-        v-for="value in filterSemester" 
-        :key="`sem-${value}`"
-        class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-      >
-        <span>Semester: {{ value }}</span>
-        <button @click="removeFilter('semester', value)" class="ml-1 text-blue-600 hover:text-blue-800">
-          <XCircleIcon class="h-3 w-3" />
-        </button>
+      <!-- Loading and error states -->
+      <div v-if="isLoading" class="text-center p-8 bg-white rounded-lg shadow">
+        <div class="h-8 w-8 text-blue-600 mx-auto animate-spin">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </div>
+        <p class="mt-2 text-sm text-gray-600">Loading students...</p>
       </div>
-      <div 
-        v-for="value in filterCourse" 
-        :key="`course-${value}`"
-        class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-      >
-        <span>Course: {{ value }}</span>
-        <button @click="removeFilter('course', value)" class="ml-1 text-blue-600 hover:text-blue-800">
-          <XCircleIcon class="h-3 w-3" />
-        </button>
+
+      <div v-else-if="error" class="bg-red-50 p-4 rounded-lg shadow">
+        <p class="text-red-600 text-sm">{{ error }}</p>
       </div>
-      <div 
-        v-for="value in filterCampus" 
-        :key="`campus-${value}`"
-        class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-      >
-        <span>Campus: {{ value }}</span>
-        <button @click="removeFilter('campus', value)" class="ml-1 text-blue-600 hover:text-blue-800">
-          <XCircleIcon class="h-3 w-3" />
-        </button>
-      </div>
-      <div 
-        v-for="value in filterScholarshipType" 
-        :key="`schol-${value}`"
-        class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-      >
-        <span>Scholarship: {{ value }}</span>
-        <button @click="removeFilter('scholarshipType', value)" class="ml-1 text-blue-600 hover:text-blue-800">
-          <XCircleIcon class="h-3 w-3" />
-        </button>
-      </div>
-    </div>
-  </div>
 
-  <div class="mt-4 flex justify-between items-center">
-    <span class="text-sm text-gray-500">
-      Showing {{ filteredStudents.length }} results
-    </span>
-    <button 
-      @click="clearFilters"
-      class="btn-clear flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
-    >
-      <XMarkIcon class="h-4 w-4" />
-      Clear Filters
-    </button>
-
-
-
-            
+      <!-- Student table -->
+      <div v-else class="bg-white rounded-lg shadow overflow-hidden ring-1 ring-gray-200">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-3 text-left">
+                  <div class="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      v-model="selectAll"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </div>
+                </th>
+                <th v-for="header in [
+                  'Student ID', 'Last Name', 'First Name', 'Middle Name',
+                  'Semester', 'Course', 'Campus', 'Scholarship Type'
+                ]" :key="header" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  {{ header }}
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr 
+                v-for="student in paginatedStudents" 
+                :key="student.id" 
+                class="hover:bg-gray-50 transition-colors duration-150"
+                :class="{'bg-blue-50': isStudentSelected(student.id)}"
+              >
+                <td class="px-3 py-4">
+                  <div class="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      :checked="isStudentSelected(student.id)"
+                      @change="toggleSelectStudent(student.id)"
+                      class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {{ student.student_id }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.last_name }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.first_name }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.middle_name || '—' }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.semester }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.course }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.campus }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium rounded-full" 
+                        :class="{
+                          'bg-blue-100 text-blue-800': student.scholarship_type.includes('Merit'),
+                          'bg-green-100 text-green-800': student.scholarship_type.includes('Financial'),
+                          'bg-purple-100 text-purple-800': student.scholarship_type.includes('Sports'),
+                          'bg-yellow-100 text-yellow-800': !['Merit', 'Financial', 'Sports'].some(type => student.scholarship_type.includes(type))
+                        }">
+                    {{ student.scholarship_type }}
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="!filteredStudents.length">
+                <td colspan="9" class="px-6 py-4 text-center text-gray-500">
+                  No students found matching the criteria
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination -->
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="text-sm text-gray-700">
+              <span v-if="itemsPerPage !== -1">
+                Showing {{ (currentPage - 1) * itemsPerPage + 1 }} 
+                to {{ Math.min(currentPage * itemsPerPage, totalStudents) }} 
+                of {{ totalStudents }} students
+              </span>
+              <span v-else>
+                Showing all {{ students.length }} students
+              </span>
             </div>
-          </div>
-        </div>
-
-        <!-- Loading and error states -->
-        <div v-if="isLoading" class="text-center p-8">
-          <div class="h-8 w-8 text-blue-600 mx-auto animate-spin">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-          </div>
-          <p class="mt-2 text-sm text-gray-600">Loading students...</p>
-        </div>
-
-        <div v-else-if="error" class="bg-red-50 p-4 rounded-lg">
-          <p class="text-red-600 text-sm">{{ error }}</p>
-        </div>
-
-        <!-- Student table -->
-        <div v-else class="bg-white rounded-lg shadow overflow-hidden ring-1 ring-gray-200">
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-300">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th v-for="header in [
-                    'Student ID', 'Last Name', 'First Name', 'Middle Name',
-                    'Semester', 'Course', 'Campus', 'Scholarship Type'
-                  ]" :key="header" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    {{ header }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200">
-                <tr 
-                  v-for="student in paginatedStudents" 
-                  :key="student.id" 
-                  class="hover:bg-gray-50 transition-colors duration-150"
-                >
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {{ student.student_id }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {{ student.last_name }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {{ student.first_name }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {{ student.middle_name || '—' }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {{ student.semester }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {{ student.course }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {{ student.campus }}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                      {{ student.scholarship_type }}
-                    </span>
-                  </td>
-                </tr>
-                <tr v-if="!filteredStudents.length">
-                  <td colspan="8" class="px-6 py-4 text-center text-gray-500">
-                    No students found matching the criteria
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <!-- Pagination -->
-          <div class="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-            <div class="text-sm text-gray-500">
-              Page {{ currentPage }} of {{ totalPages }}
-            </div>
-            <div class="flex gap-2">
-              <button
-                @click="changePage(currentPage - 1)"
-                :disabled="currentPage === 1"
-                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            <div class="flex items-center justify-end gap-2">
+              <button 
+                @click="changePage(1)" 
+                :disabled="currentPage === 1 || isLoading || itemsPerPage === -1"
+                class="px-2 py-1 rounded text-sm text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent"
+              >
+                First
+              </button>
+              <button 
+                @click="changePage(currentPage - 1)" 
+                :disabled="currentPage === 1 || isLoading || itemsPerPage === -1"
+                class="px-3 py-1 rounded text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 Previous
               </button>
-              <button
-                @click="changePage(currentPage + 1)"
-                :disabled="currentPage === totalPages || totalPages === 0"
-                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              
+              <span class="mx-2 text-sm text-gray-600">
+                Page {{ currentPage }} of {{ totalPages }}
+              </span>
+              
+              <button 
+                @click="changePage(currentPage + 1)" 
+                :disabled="currentPage === totalPages || isLoading || itemsPerPage === -1"
+                class="px-3 py-1 rounded text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 Next
+              </button>
+              <button 
+                @click="changePage(totalPages)" 
+                :disabled="currentPage === totalPages || isLoading || itemsPerPage === -1"
+                class="px-2 py-1 rounded text-sm text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:hover:bg-transparent"
+              >
+                Last
               </button>
             </div>
           </div>
         </div>
       </div>
-   
-
+    </div>
   </MainLayout>
 </template>
 
 <style scoped>
 .btn-refresh {
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .btn-clear {
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .filter-select {
@@ -763,16 +1055,9 @@ onMounted(() => {
 
 /* Add export button styling */
 .btn-export {
-  transition: color 0.2s ease;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  background-color: rgba(243, 244, 246, 0.5);
-  border: 1px solid rgba(209, 213, 219, 0.3);
+  transition: all 0.2s ease;
 }
 
-.btn-export:hover {
-  background-color: rgba(229, 231, 235, 0.5);
-}
 .filter-dropdown-container {
   position: relative;
 }
@@ -786,8 +1071,7 @@ onMounted(() => {
 }
 
 .filter-dropdown-container .dropdown {
-  max-height: 224px; /* Adjust as needed */
+  max-height: 224px;
   overflow-y: auto;
 }
-
 </style>
