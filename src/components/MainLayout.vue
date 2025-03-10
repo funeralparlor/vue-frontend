@@ -122,8 +122,8 @@ const userNavigation = [
       <div class="flex h-16 shrink-0 items-center px-6 gap-4">
         <img class="h-8 w-8 rounded-full" :src="user.imageUrl" alt="Profile" />
         <div>
-          <p class="text-sm font-medium text-white">BulSU</p>
-          <span class="text-xs text-blue-400">Admin</span>
+          <p class="text-sm font-medium text-white">Student Scholarship Profiling </p>
+          <span class="text-xs text-blue-400">Scholarship Office</span>
         </div>
       </div>
       <nav class="mt-6 px-4">

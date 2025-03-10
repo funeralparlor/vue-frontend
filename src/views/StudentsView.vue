@@ -425,7 +425,7 @@ onUnmounted(() => {
                   <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.student_status }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <button @click="editStudent(student.id)" class="text-blue-600 hover:text-blue-900 mr-4">
-                    Edit
+                    View Student
                   </button>
                   <button 
                     @click="deleteStudent(student.id)" 
@@ -506,7 +506,7 @@ onUnmounted(() => {
       <Dialog :open="!!editingStudent" @close="closeEditModal" class="relative z-50">
         <div class="fixed inset-0 bg-black/30" aria-hidden="true" />
         <div class="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel class="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
+          <DialogPanel class="w-full rounded-xl p-6 shadow-lg">
             <div class="flex justify-between items-center mb-4">
               <DialogTitle class="text-lg font-semibold">Edit Student</DialogTitle>
               <button 

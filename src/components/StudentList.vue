@@ -11,6 +11,7 @@ import 'jspdf-autotable';
 import { ChevronDownIcon, XCircleIcon, CheckIcon } from '@heroicons/vue/24/outline';
 
 // Reactive state
+const filterYearLevel = ref([]);
 const filterSemester = ref([]);
 const filterCourse = ref([]);
 const filterCampus = ref([]);
@@ -20,14 +21,16 @@ const dropdownStates = ref({
   course: false,
   campus: false,
   scholarshipType: false,
+  yearlevel: false,
   perPage: false,
 });
 
 const selectedCountLabels = computed(() => ({
-  semester: filterSemester.value.length ? `${filterSemester.value.length} selected` : 'All Semesters',
+  yearlevel: filterYearLevel.value.length ? `${filterYearLevel.value.length} selected` : 'Year Level',
+  semester: filterSemester.value.length ? `${filterSemester.value.length} selected` : 'All Colleges',
   course: filterCourse.value.length ? `${filterCourse.value.length} selected` : 'All Courses',
   campus: filterCampus.value.length ? `${filterCampus.value.length} selected` : 'All Campuses',
-  scholarshipType: filterScholarshipType.value.length ? `${filterScholarshipType.value.length} selected` : 'All Scholarship Types',
+  scholarshipType: filterScholarshipType.value.length ? `${filterScholarshipType.value.length} selected` : 'Student Status',
 }));
 
 const students = ref([]);
@@ -111,6 +114,7 @@ onMounted(() => {
 
 const toggleFilter = (filterType, value) => {
   const filterRef = {
+    yearlevel: filterYearLevel,
     semester: filterSemester,
     course: filterCourse,
     campus: filterCampus,
@@ -126,6 +130,7 @@ const toggleFilter = (filterType, value) => {
 
 const removeFilter = (filterType, value) => {
   const filterRef = {
+    yearlevel: filterYearLevel,
     semester: filterSemester,
     course: filterCourse,
     campus: filterCampus,
@@ -136,6 +141,7 @@ const removeFilter = (filterType, value) => {
 };
 
 const clearFilters = () => {
+  filterYearLevel.value = [];
   filterSemester.value = [];
   filterCourse.value = [];
   filterCampus.value = [];
@@ -169,10 +175,11 @@ const userNavigation = [
 
 // Computed properties
 const filterOptions = computed(() => ({
-  semester: [...new Set(students.value.map(s => s.semester))].sort(),
+  yearlevel: [...new Set(students.value.map(s => s.year_level))].sort(),
+  semester: [...new Set(students.value.map(s => s.college))].sort(),
   course: [...new Set(students.value.map(s => s.course))].sort(),
   campus: [...new Set(students.value.map(s => s.campus))].sort(),
-  scholarshipType: [...new Set(students.value.map(s => s.scholarship_type))].sort(),
+  scholarshipType: [...new Set(students.value.map(s => s.student_status))].sort(),
 }));
 
 // Using the data returned from the API
@@ -209,8 +216,11 @@ const loadStudents = async () => {
     };
 
     // Add filter parameters if they exist
+    if (filterYearLevel.value.length > 0) {
+      params.year_level = filterYearLevel.value;
+    }
     if (filterSemester.value.length > 0) {
-      params.semester = filterSemester.value;
+      params.college = filterSemester.value;
     }
     if (filterCourse.value.length > 0) {
       params.course = filterCourse.value;
@@ -219,7 +229,7 @@ const loadStudents = async () => {
       params.campus = filterCampus.value;
     }
     if (filterScholarshipType.value.length > 0) {
-      params.scholarship_type = filterScholarshipType.value;
+      params.student_status = filterScholarshipType.value;
     }
 
     // Make the API request
@@ -253,7 +263,7 @@ const loadStudents = async () => {
 };
 
 // Watch for changes to filters to reload data
-watch([filterSemester, filterCourse, filterCampus, filterScholarshipType, searchQuery], () => {
+watch([filterYearLevel, filterSemester, filterCourse, filterCampus, filterScholarshipType, searchQuery], () => {
   currentPage.value = 1;
   loadStudents();
 });
@@ -267,6 +277,7 @@ const changePage = (page) => {
 
 // Filter refs mapping for dynamic binding
 const filterRefs = {
+  yearlevel: filterYearLevel,
   semester: filterSemester,
   course: filterCourse,
   campus: filterCampus,
@@ -297,10 +308,11 @@ const exportToExcel = async () => {
         search: searchQuery.value || undefined,
       };
       
-      if (filterSemester.value.length > 0) params.semester = filterSemester.value;
+      if (filterYearLevel.value.length > 0) params.year_level = filterYearLevel.value;
+      if (filterSemester.value.length > 0) params.college = filterSemester.value;
       if (filterCourse.value.length > 0) params.course = filterCourse.value;
       if (filterCampus.value.length > 0) params.campus = filterCampus.value;
-      if (filterScholarshipType.value.length > 0) params.scholarship_type = filterScholarshipType.value;
+      if (filterScholarshipType.value.length > 0) params.student_status = filterScholarshipType.value;
       
       const response = await api.get('/students', { params });
       exportData = response.data.data;
@@ -318,10 +330,10 @@ const exportToExcel = async () => {
     'Last Name': student.last_name,
     'First Name': student.first_name,
     'Middle Name': student.middle_name || '-',
-    'Semester': student.semester,
+    'Semester': student.college,
     'Course': student.course,
     'Campus': student.campus,
-    'Scholarship Type': student.scholarship_type
+    'Student Status': student.student_status
   }));
 
   const worksheet = xlsxUtils.json_to_sheet(data);
@@ -363,6 +375,7 @@ const exportToExcel = async () => {
     ["Semester:", filterSemester.value.join(", ") || "All"],
     ["Course:", filterCourse.value.join(", ") || "All"],
     ["Campus:", filterCampus.value.join(", ") || "All"],
+    ["Year Level:", filterYearLevel.value.join(", ") || "All"],
     ["Scholarship Type:", filterScholarshipType.value.join(", ") || "All"],
     ["Search Query:", searchQuery.value || "None"],
     ["Selection:", selectionInfo]
@@ -390,10 +403,11 @@ const exportToPDF = async () => {
         search: searchQuery.value || undefined,
       };
       
-      if (filterSemester.value.length > 0) params.semester = filterSemester.value;
+      if (filterYearLevel.value.length > 0) params.year_level = filterYearLevel.value;
+      if (filterSemester.value.length > 0) params.college = filterSemester.value;
       if (filterCourse.value.length > 0) params.course = filterCourse.value;
       if (filterCampus.value.length > 0) params.campus = filterCampus.value;
-      if (filterScholarshipType.value.length > 0) params.scholarship_type = filterScholarshipType.value;
+      if (filterScholarshipType.value.length > 0) params.student_status = filterScholarshipType.value;
       
       const response = await api.get('/students', { params });
       exportData = response.data.data;
@@ -445,6 +459,7 @@ const exportToPDF = async () => {
 
   // Filter information
   const filters = [
+    filterYearLevel.value.length > 0 && `Year Level: ${filterYearLevel.value.join(', ')}`,
     filterSemester.value.length > 0 && `Semester: ${filterSemester.value.join(', ')}`,
     filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
     filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
@@ -478,10 +493,10 @@ const exportToPDF = async () => {
     'Last Name': student.last_name || '-',
     'First Name': student.first_name || '-',
     'Middle Name': student.middle_name || '-',
-    'Semester': student.semester || '-',
+    'Semester': student.college || '-',
     'Course': student.course || '-',
     'Campus': student.campus || '-',
-    'Scholarship Type': student.scholarship_type || '-'
+    'Student Status': student.student_status || '-'
   }));
 
   // Generate table
@@ -642,9 +657,53 @@ onMounted(() => {
             </div>
           </div>
 
+<!-- Multi-select dropdown for Year Level -->
+          <div class="filter-dropdown-container relative">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+            <button 
+              @click.stop="toggleDropdown('yearlevel')"
+              class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <span class="truncate">{{ selectedCountLabels.yearlevel }}</span>
+              <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+            </button>
+            <div 
+              v-if="dropdownStates.yearlevel"
+              class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+            >
+              <div class="p-2 border-b">
+                <div class="mb-2 text-xs text-gray-500">
+                  {{ filterYearLevel.length }} of {{ filterOptions.yearlevel.length }} selected
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div 
+                    v-for="value in filterYearLevel" 
+                    :key="value"
+                    class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    <span>{{ value }}</span>
+                    <button @click.stop="removeFilter('yearlevel', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                      <XCircleIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div 
+                v-for="option in filterOptions.yearlevel" 
+                :key="option"
+                @click.stop="toggleFilter('yearlevel', option)"
+                class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
+              >
+                <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterYearLevel.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
+                  <CheckIcon v-if="filterYearLevel.includes(option)" class="h-3 w-3 text-white" />
+                </div>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
           <!-- Multi-select dropdown for Semester -->
           <div class="filter-dropdown-container relative">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">College</label>
             <button 
               @click.stop="toggleDropdown('semester')"
               class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -779,7 +838,7 @@ onMounted(() => {
 
           <!-- Multi-select dropdown for Scholarship Type -->
           <div class="filter-dropdown-container relative">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Scholarship Type</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Student Status</label>
             <button 
               @click.stop="toggleDropdown('scholarshipType')"
               class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -824,15 +883,25 @@ onMounted(() => {
         </div>
 
         <!-- Active filter tags -->
-        <div v-if="filterSemester.length || filterCourse.length || filterCampus.length || filterScholarshipType.length" class="mt-4">
+        <div v-if="filterYearLevel.length || filterSemester.length || filterCourse.length || filterCampus.length || filterScholarshipType.length" class="mt-4">
           <h3 class="text-sm font-medium text-gray-700 mb-2">Active Filters:</h3>
           <div class="flex flex-wrap gap-2">
+            <div 
+              v-for="value in filterYearLevel" 
+              :key="`sem-${value}`"
+              class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+            >
+              <span>Year Level: {{ value }}</span>
+              <button @click="removeFilter('yearlevel', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                <XCircleIcon class="h-3 w-3" />
+              </button>
+            </div>
             <div 
               v-for="value in filterSemester" 
               :key="`sem-${value}`"
               class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
             >
-              <span>Semester: {{ value }}</span>
+              <span>College: {{ value }}</span>
               <button @click="removeFilter('semester', value)" class="ml-1 text-blue-600 hover:text-blue-800">
                 <XCircleIcon class="h-3 w-3" />
               </button>
@@ -916,7 +985,7 @@ onMounted(() => {
                 </th>
                 <th v-for="header in [
                   'Student ID', 'Last Name', 'First Name', 'Middle Name',
-                  'Semester', 'Course', 'Campus', 'Scholarship Type'
+                  'Course', 'College', 'Campus', 'Year Level', 'Gender', 'Student Status'
                 ]" :key="header" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   {{ header }}
                 </th>
@@ -952,25 +1021,24 @@ onMounted(() => {
                   {{ student.middle_name || '—' }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {{ student.semester }}
+                  {{ student.course }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {{ student.course }}
+                  {{ student.college }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {{ student.campus }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="px-2 py-1 text-xs font-medium rounded-full" 
-                        :class="{
-                          'bg-blue-100 text-blue-800': student.scholarship_type.includes('Merit'),
-                          'bg-green-100 text-green-800': student.scholarship_type.includes('Financial'),
-                          'bg-purple-100 text-purple-800': student.scholarship_type.includes('Sports'),
-                          'bg-yellow-100 text-yellow-800': !['Merit', 'Financial', 'Sports'].some(type => student.scholarship_type.includes(type))
-                        }">
-                    {{ student.scholarship_type }}
-                  </span>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.year_level }}
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.gender }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.student_status }}
+                </td>
+                
               </tr>
               <tr v-if="!filteredStudents.length">
                 <td colspan="9" class="px-6 py-4 text-center text-gray-500">

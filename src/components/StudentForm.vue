@@ -192,10 +192,23 @@ const GENDERS = [
 
 // Year levels
 const YEAR_LEVELS = [
-  { value: '1', label: '1st Year' },
-  { value: '2', label: '2nd Year' },
-  { value: '3', label: '3rd Year' },
-  { value: '4', label: '4th Year' }
+  { value: '1st Year', label: '1st Year' },
+  { value: '2nd Year', label: '2nd Year' },
+  { value: '3rd Year', label: '3rd Year' },
+  { value: '4th Year', label: '4th Year' }
+
+];
+
+// Student Status
+const STUDENT_STATUS = [
+  { value: 'Regular', label: 'Regular' },
+  { value: 'Irregular', label: 'Irregular' }
+
+];
+// student approval
+const STUDENT_APPROVAL = [
+  { value: 'Yes', label: 'Yes' },
+  { value: 'No', label: 'No' }
 
 ];
 
@@ -407,7 +420,9 @@ const closeModal = () => {
   
         <!-- Form Section -->
         <form @submit.prevent="createStudent" class="space-y-5">
+           <label for="province" class="block text-sm font-bold text-gray-700 mb-5">Student's Academic Information</label>
           <!-- Student ID Field -->
+          <section class="mb-8 p-5 bg-gray-50 rounded-lg border border-gray-200">
           <div>
             <label for="student_id" class="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
             <input
@@ -552,9 +567,59 @@ const closeModal = () => {
                 </option>
               </select>
             </div>
+             <div>
+              <label for="section" class="block text-sm font-medium text-gray-700 mb-1">Section</label>
+              <input
+                id="section"
+                v-model="student.section"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Section"
+              />
+            </div>
+            <div>
+              <label for="last_sem" class="block text-sm font-medium text-gray-700 mb-1">Last Semester of Enrolment of Inactive</label>
+              <input
+                id="last_sem"
+                v-model="student.last_sem"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Last Semester"
+              />
+            </div>
+            
+             <div>
+              <label for="student_status" class="block text-sm font-medium text-gray-700 mb-1">Student's Status</label>
+              <select
+                id="student_status"
+                v-model="student.student_status"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select Student's Status</option>
+                <option v-for="option in STUDENT_STATUS" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+             <div>
+              <label for="approved" class="block text-sm font-medium text-gray-700 mb-1">Approval of the Sharing of Student Information</label>
+              <select
+                id="approved"
+                v-model="student.approved"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Approve to Share the Information?</option>
+                <option v-for="option in STUDENT_APPROVAL" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+            </div>
+
           </div>
-  
+          </section>
+  <label for="province" class="block text-sm font-bold text-gray-700 mb-5">Student's Personal Information</label>
           <!-- Personal Information -->
+          <section class="mb-8 p-5 bg-gray-50 rounded-lg border border-gray-200">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label for="gender" class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
@@ -580,6 +645,134 @@ const closeModal = () => {
               />
             </div>
           </div>
+          <!-- Address Fields -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+           <div>
+              <label for="birth_place" class="block text-sm font-medium text-gray-700 mb-1">Birth Place</label>
+              <input
+                id="birth_place"
+                v-model="student.birth_place"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Birth Place"
+              />
+            </div>
+            <div>
+              <label for="barangay" class="block text-sm font-medium text-gray-700 mb-1">Barangay</label>
+              <input
+                id="barangay"
+                v-model="student.barangay"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Barangay"
+              />
+            </div>
+            <div>
+              <label for="town" class="block text-sm font-medium text-gray-700 mb-1">Town</label>
+              <input
+                id="town"
+                v-model="student.town"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Town"
+              />
+            </div>
+            <div>
+              <label for="province" class="block text-sm font-medium text-gray-700 mb-1">Province</label>
+              <input
+                id="province"
+                v-model="student.province"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Province"
+              />
+            </div>
+          </div>
+          <div>
+              <label for="comp_address" class="block text-sm font-medium text-gray-700 mb-1">Complete Current Address</label>
+              <input
+                id="comp_address"
+                v-model="student.comp_address"
+                type="description"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Complete Current Address"
+              />
+            </div>
+
+            <!-- Address Fields -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <div>
+              <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input
+                id="email"
+                v-model="student.email"
+                type="email"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Email"
+              />
+            </div>
+            <div>
+              <label for="number" class="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
+              <input
+                id="number"
+                v-model="student.number"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Number"
+              />
+            </div>
+            
+          </div>
+          <label for="province" class="block text-sm font-bold text-gray-700 mb-5">Student's Parents Information</label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <div>
+              <label for="father_name" class="block text-sm font-medium text-gray-700 mb-1">Father's Name</label>
+              <input
+                id="father_name"
+                v-model="student.father_name"
+                type="father_name"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Father's Name"
+              />
+            </div>
+            <div>
+              <label for="father_occup" class="block text-sm font-medium text-gray-700 mb-1">Father's Occupation</label>
+              <input
+                id="text"
+                v-model="student.father_occup"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Father's Occupation"
+              />
+            </div>
+            
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+           <div>
+              <label for="mother_name" class="block text-sm font-medium text-gray-700 mb-1">Mother's Name</label>
+              <input
+                id="mother_name"
+                v-model="student.mother_name"
+                type="mother_name"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Mother's Name"
+              />
+            </div>
+            <div>
+              <label for="mother_occup" class="block text-sm font-medium text-gray-700 mb-1">Mother's Occupation</label>
+              <input
+                id="text"
+                v-model="student.mother_occup"
+                type="text"
+                class="block w-full rounded-md border-gray-300 border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                 placeholder="Enter Mother's Occupation"
+              />
+            </div>
+            
+          </div>
+          </section>
+         
+  
   
           <!-- Error Message -->
           <div v-if="error" class="rounded-md bg-red-50 p-4 border border-red-200">
