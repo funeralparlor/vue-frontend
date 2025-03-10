@@ -159,19 +159,7 @@ const user = {
   imageUrl: 'https://upload.wikimedia.org/wikipedia/en/7/7e/Bulacan_State_University_logo.png',
 };
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: 'Home' },
-  { name: 'Add Student', href: '/home', icon: 'Users' },
-  { name: 'Student List', href: '/list', icon: 'Folder', current: true },
-  { name: '', href: '#', icon: 'Calendar' },
-  { name: '', href: '#', icon: 'ChartBar' },
-];
 
-const userNavigation = [
-  { name: 'Your Profile', href: '#' },
-  { name: 'Settings', href: '#' },
-  { name: 'Sign out', href: '#' },
-];
 
 // Computed properties
 const filterOptions = computed(() => ({
@@ -326,14 +314,32 @@ const exportToExcel = async () => {
   }
 
   const data = exportData.map(student => ({
-    'Student ID': student.student_id,
-    'Last Name': student.last_name,
-    'First Name': student.first_name,
-    'Middle Name': student.middle_name || '-',
-    'Semester': student.college,
-    'Course': student.course,
-    'Campus': student.campus,
-    'Student Status': student.student_status
+    'STUDENT NUMBER': student.student_id,
+    'LAST NAME': student.last_name,
+    'GIVEN NAME': student.first_name,
+    'MIDDLE NAME': student.middle_name || '-',
+    'COURSE': student.course,
+    'COLLEGE': student.college,
+    'CAMPUS': student.campus,
+    'YEAR LEVEL': student.year_level,
+    'GENDER': student.gender,
+    'DATE OF BIRTH': student.birthday,
+    'PLACE OF BIRTH': student.birth_place,
+    'COMPLETE ADDRESS': student.comp_address,
+    'BARANGAY': student.barangay,
+    'TOWN/CITY': student.town,
+    'Province': student.province,
+    'Email': student.email,
+    'MobileNo': student.number,
+    'FatherName': student.father_name,
+    'Father_Occupation': student.father_occup,
+    'MotherName': student.mother_name,
+    'Mother_Occupation': student.mother_occup,
+    'Student_Status': student.student_status,
+    'Last sem of enrolment for inactive': student.last_sem,
+    'Section': student.section,
+    'Approved to share the information': student.approved
+    
   }));
 
   const worksheet = xlsxUtils.json_to_sheet(data);
@@ -372,7 +378,6 @@ const exportToExcel = async () => {
   const infoSheet = xlsxUtils.aoa_to_sheet([
     ["Export Date:", new Date().toLocaleString()],
     ["Filters Applied:", ""],
-    ["Semester:", filterSemester.value.join(", ") || "All"],
     ["Course:", filterCourse.value.join(", ") || "All"],
     ["Campus:", filterCampus.value.join(", ") || "All"],
     ["Year Level:", filterYearLevel.value.join(", ") || "All"],

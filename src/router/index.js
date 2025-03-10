@@ -4,18 +4,20 @@ import StudentList from '@/components/StudentList.vue';
 import Dashboard from '@/components/Dashboard.vue';
 import Login from '@/views/Login.vue'; // Add missing import
 import Register from '@/views/Register.vue';
+import Landing from '@/views/landing.vue';
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { 
       path: '/',
-      name: 'login',
-      component: Login,
+      name: 'landing',
+      component: Landing,
       meta: { requiresGuest: true } // New meta field
     },
     { 
-      path: '/login', 
+      path: '/login',
       name: 'login',
       component: Login,
       meta: { requiresGuest: true } // New meta field
@@ -63,7 +65,7 @@ router.beforeEach((to, from, next) => {
   }
   // Redirect authenticated users from guest routes
   else if (to.meta.requiresGuest && token) {
-    next({ name: 'dashboard' }); // Or your preferred redirect route
+    next({ name: 'home' }); // Or your preferred redirect route
   } else {
     next();
   }

@@ -1,7 +1,6 @@
 
 import axios from 'axios';
-import { RouterView } from 'vue-router'
-import { ref } from 'vue';
+
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
