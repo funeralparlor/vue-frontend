@@ -339,43 +339,101 @@ const exportToExcel = async () => {
     'Last sem of enrolment for inactive': student.last_sem,
     'Section': student.section,
     'Approved to share the information': student.approved
-    
   }));
 
+  // Create worksheet from data
   const worksheet = xlsxUtils.json_to_sheet(data);
   const workbook = xlsxUtils.book_new();
   
-  // Add header style
+  // Enhanced header styling
   const headerStyle = {
-    font: { bold: true, color: { rgb: "FFFFFF" } },
-    fill: { fgColor: { rgb: "1E3A8A" } }, // Dark blue
-    border: { bottom: { style: "medium", color: { rgb: "000000" } } }
+    font: { 
+      bold: true, 
+      color: { rgb: "FFFFFF" },
+      name: "Arial",
+      sz: 12
+    },
+    fill: { 
+      patternType: "solid", 
+      fgColor: { rgb: "1E3A8A" } // Dark blue
+    },
+    border: {
+      top: { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left: { style: "thin", color: { rgb: "000000" } },
+      right: { style: "thin", color: { rgb: "000000" } }
+    },
+    alignment: {
+      horizontal: "center",
+      vertical: "center",
+      wrapText: true
+    }
+  };
+
+  // Cell style for data rows
+  const dataStyle = {
+    border: {
+      top: { style: "thin", color: { rgb: "CCCCCC" } },
+      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+      left: { style: "thin", color: { rgb: "CCCCCC" } },
+      right: { style: "thin", color: { rgb: "CCCCCC" } }
+    },
+    alignment: {
+      vertical: "center"
+    }
   };
 
   // Apply styles to header row
   const range = xlsxUtils.decode_range(worksheet['!ref']);
+  
+  // Get all column headers to calculate optimal width
+  const headers = Object.keys(data[0]);
+  
+  // Apply header styles and initialize column width tracking
+  const colWidths = {};
   for(let C = range.s.c; C <= range.e.c; C++) {
     const cell = xlsxUtils.encode_cell({ c: C, r: 0 });
     worksheet[cell].s = headerStyle;
+    
+    // Initialize column width with header length plus padding
+    const header = headers[C];
+    colWidths[C] = Math.max(header.length + 2, 10); // Minimum width of 10
   }
-
-  // Set column widths
-  worksheet['!cols'] = [
-    { wch: 12 }, { wch: 15 }, { wch: 15 },
-    { wch: 15 }, { wch: 10 }, { wch: 25 },
-    { wch: 20 }, { wch: 20 }
-  ];
+  
+  // Calculate width based on content
+  for(let R = range.s.r + 1; R <= range.e.r; R++) {
+    for(let C = range.s.c; C <= range.e.c; C++) {
+      const cell = xlsxUtils.encode_cell({ c: C, r: R });
+      
+      // Apply data cell style
+      if (worksheet[cell]) {
+        worksheet[cell].s = dataStyle;
+        
+        // Update column width based on content length
+        const content = worksheet[cell].v ? String(worksheet[cell].v) : '';
+        colWidths[C] = Math.max(colWidths[C], Math.min(content.length + 1, 50)); // Cap at 50
+      }
+    }
+  }
+  
+  // Set optimized column widths
+  worksheet['!cols'] = Array.from({ length: range.e.c + 1 }, (_, i) => ({ wch: colWidths[i] }));
 
   // Add metadata and freeze header row
   worksheet['!autofilter'] = { ref: worksheet['!ref'] };
-  worksheet['!freeze'] = { ySplit: 1 };
+  worksheet['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2' };
   
-  // Add export info
+  // Add export info with styling
+  const infoStyle = {
+    font: { bold: true },
+    fill: { patternType: "solid", fgColor: { rgb: "F5F5F5" } }
+  };
+  
   const selectionInfo = selectedStudents.value.length > 0 
     ? `Selected: ${selectedStudents.value.length} students` 
     : `All: ${exportData.length} students`;
 
-  const infoSheet = xlsxUtils.aoa_to_sheet([
+  const infoData = [
     ["Export Date:", new Date().toLocaleString()],
     ["Filters Applied:", ""],
     ["Course:", filterCourse.value.join(", ") || "All"],
@@ -384,12 +442,35 @@ const exportToExcel = async () => {
     ["Scholarship Type:", filterScholarshipType.value.join(", ") || "All"],
     ["Search Query:", searchQuery.value || "None"],
     ["Selection:", selectionInfo]
-  ]);
+  ];
+  
+  const infoSheet = xlsxUtils.aoa_to_sheet(infoData);
+  
+  // Apply styling to info sheet
+  const infoRange = xlsxUtils.decode_range(infoSheet['!ref']);
+  for(let R = infoRange.s.r; R <= infoRange.e.r; R++) {
+    const labelCell = xlsxUtils.encode_cell({ c: 0, r: R });
+    if (infoSheet[labelCell]) {
+      infoSheet[labelCell].s = infoStyle;
+    }
+  }
+  
+  // Auto-size info sheet columns
+  infoSheet['!cols'] = [
+    { wch: 20 }, // Labels
+    { wch: 50 }  // Values
+  ];
+  
+  // Add timestamp to filename with more readable format
+  const timestamp = new Date().toISOString()
+    .replace(/T/, '_')
+    .replace(/\..+/, '')
+    .replace(/:/g, '-');
   
   xlsxUtils.book_append_sheet(workbook, infoSheet, 'Export Info');
   xlsxUtils.book_append_sheet(workbook, worksheet, 'Students');
   
-  writeXLSXFile(workbook, `students_export_${new Date().toISOString()}.xlsx`);
+  writeXLSXFile(workbook, `students_export_${timestamp}.xlsx`);
 };
 
 // Enhanced PDF Export
@@ -425,58 +506,105 @@ const exportToPDF = async () => {
     }
   }
 
+  // Calculate total number of students in the export data
+  const dataCount = exportData.length;
+
+  // Create PDF with better initial settings
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
-    format: 'a4'
+    format: 'a4',
+    compress: true, // Enable compression for smaller file size
+    putOnlyUsedFonts: true // Optimize font usage
   });
 
-  // Add header section
+  // Add university logo
   const logo = new Image();
   logo.src = user.imageUrl;
-  doc.addImage(logo, 'PNG', 15, 10, 15, 15);
+  doc.addImage(logo, 'PNG', 15, 10, 20, 20);
 
-  // Define column widths
-  const columnStyles = {
-    0: { cellWidth: 20 }, // Student ID
-    1: { cellWidth: 30 }, // Last Name
-    2: { cellWidth: 30 }, // First Name
-    3: { cellWidth: 30 }, // Middle Name
-    4: { cellWidth: 20 }, // Semester
-    5: { cellWidth: 40 }, // Course
-    6: { cellWidth: 35 }, // Campus
-    7: { cellWidth: 35 }, // Scholarship Type
-  };
-
-  
-  doc.setFontSize(16);
+  // Improved header styling
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('BulSU Student List Export', 35, 20);
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(`Exported: ${new Date().toLocaleString()}`, 15, 30);
+  doc.setTextColor(30, 58, 138); // Blue color for header
+  doc.text('BulSU Student List Export', 40, 20);
+  
+  // Add a divider line
+  doc.setDrawColor(30, 58, 138); // Blue color for line
+  doc.setLineWidth(0.5);
+  doc.line(15, 25, 280, 25);
 
-  // Selection information
+  // Export details section with improved layout
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(60, 60, 60);
+  
+  // Format date more nicely
+  const exportDate = new Date().toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  doc.text(`Exported on: ${exportDate}`, 15, 32);
+  
+  // Add user info if available
+  if (user.name) {
+    doc.text(`Exported by: ${user.name}`, 15, 37);
+  }
+
+  // Selection information with improved formatting
   const selectionInfo = selectedStudents.value.length > 0 
     ? `Selected: ${selectedStudents.value.length} of ${totalStudents.value} students` 
-    : `All filtered: ${exportData.length} students`;
-  doc.text(selectionInfo, 15, 35);
+    : `All filtered: ${dataCount} students`;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(selectionInfo, 15, 43);
 
-  // Filter information
-  const filters = [
+  // Filter information with better organization
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80, 80, 80);
+  
+  // Create a more structured filter display
+  const filterItems = [
     filterYearLevel.value.length > 0 && `Year Level: ${filterYearLevel.value.join(', ')}`,
     filterSemester.value.length > 0 && `Semester: ${filterSemester.value.join(', ')}`,
     filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
     filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
     filterScholarshipType.value.length > 0 && `Scholarship: ${filterScholarshipType.value.join(', ')}`,
-    searchQuery.value && `Search: ${searchQuery.value}`
-  ].filter(Boolean).join('  •  ');
+    searchQuery.value && `Search: "${searchQuery.value}"`
+  ].filter(Boolean);
+  
+  // Organize filters in a cleaner layout
+  let filterY = 48;
+  if (filterItems.length > 0) {
+    doc.text('Filters applied:', 15, filterY);
+    filterY += 4;
+    
+    // Split filters into multiple lines if needed
+    const maxLineLength = 120; // characters
+    for (let i = 0; i < filterItems.length; i++) {
+      // Add bullet point
+      doc.text('•', 17, filterY);
+      
+      // Handle text wrapping for long filter values
+      const filterText = filterItems[i];
+      if (filterText.length > maxLineLength) {
+        const lines = doc.splitTextToSize(filterText, 245);
+        doc.text(lines, 22, filterY);
+        filterY += 4 * (lines.length);
+      } else {
+        doc.text(filterText, 22, filterY);
+        filterY += 4;
+      }
+    }
+  }
 
-  doc.setFontSize(10);
-  doc.setTextColor(50);
-  doc.text(filters, 15, 40);
-
-  // Table configuration
+  // Table configuration with improved column definitions
   const headers = [
     'Student ID',
     'Last Name',
@@ -485,75 +613,183 @@ const exportToPDF = async () => {
     'Semester',
     'Course',
     'Campus',
-    'Scholarship Type'
-  ].map(h => ({
-    title: h,
-    dataKey: h,
-    halign: 'center'
-  }));
+    'Student Status'
+  ];
 
-  const data = exportData.map(student => ({
-    ...student,
-    'Student ID': student.student_id || '-',
-    'Last Name': student.last_name || '-',
-    'First Name': student.first_name || '-',
-    'Middle Name': student.middle_name || '-',
-    'Semester': student.college || '-',
-    'Course': student.course || '-',
-    'Campus': student.campus || '-',
-    'Student Status': student.student_status || '-'
-  }));
+  // Transform data for the table with proper field mapping
+  const tableData = exportData.map(student => [
+    student.student_id || '-',
+    student.last_name || '-',
+    student.first_name || '-',
+    student.middle_name || '-',
+    student.college || '-',
+    student.course || '-',
+    student.campus || '-',
+    student.student_status || '-'
+  ]);
 
-  // Generate table
+  // Calculate starting Y position based on filters
+  const tableStartY = Math.min(filterY + 5, 65);
+
+  // Generate table with improved styling
   doc.autoTable({
-    head: [headers.map(h => h.title)],
-    body: data.map(row => headers.map(h => row[h.dataKey])),
-    startY: 45,
+    head: [headers],
+    body: tableData,
+    startY: tableStartY,
     theme: 'grid',
     styles: {
-      fontSize: 10,
-      cellPadding: 1.5,
+      fontSize: 9,
+      cellPadding: 2,
       font: 'helvetica',
       valign: 'middle',
-      textColor: [31, 41, 55] // gray-800
+      overflow: 'linebreak', // Handle text overflow better
+      textColor: [31, 41, 55], // gray-800
+      lineWidth: 0.1,
+      lineColor: [200, 200, 200]
     },
     headStyles: {
       fillColor: [30, 58, 138], // blue-900
       textColor: 255,
       fontStyle: 'bold',
-      halign: 'center'
+      halign: 'center',
+      cellPadding: 3,
+      minCellHeight: 14
     },
     alternateRowStyles: {
-      fillColor: [243, 244, 246] // gray-50
+      fillColor: [245, 247, 250] // Light blue-gray for better readability
     },
+    // Improved column widths based on content
     columnStyles: {
-      0: { cellWidth: 25 },
-      1: { cellWidth: 30 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 30 },
-      4: { cellWidth: 20 },
-      5: { cellWidth: 40 },
-      6: { cellWidth: 35 },
-      7: { cellWidth: 35 }
+      0: { cellWidth: 25, halign: 'center' }, // Student ID
+      1: { cellWidth: 30 }, // Last Name
+      2: { cellWidth: 30 }, // First Name
+      3: { cellWidth: 25 }, // Middle Name
+      4: { cellWidth: 20, halign: 'center' }, // Semester
+      5: { cellWidth: 40 }, // Course
+      6: { cellWidth: 35 }, // Campus
+      7: { cellWidth: 35 } // Scholarship Type
     },
-    margin: { left: 15, right: 15 }
+    margin: { left: 15, right: 15 },
+    didDrawPage: (data) => {
+      // Add header to each page
+      if (data.pageNumber > 1) {
+        // For pages after the first, add a simpler header
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 58, 138);
+        doc.text('BulSU Student List Export (Continued)', 15, 15);
+        
+        doc.setLineWidth(0.3);
+        doc.line(15, 18, 280, 18);
+      }
+    },
+    didParseCell: (data) => {
+      // Customize specific cells if needed
+      if (data.row.section === 'head') {
+        // Add more custom styling for header if needed
+      }
+    },
+    willDrawCell: (data) => {
+      // Add custom styling to specific cells
+      if (data.row.section === 'body') {
+        // For example, highlight certain values
+        if (data.column.index === 7 && data.cell.text[0]?.includes('Full')) { // Scholarship column
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [0, 100, 0]; // Dark green for Full Scholarship
+        }
+      }
+    }
   });
 
-  // Add footer
-  const pageCount = doc.getNumberOfPages();
-  for(let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
+  // Get final Y position to add summary information
+  const finalY = (doc.lastAutoTable?.finalY || 180) + 10;
+  
+  // Add summary statistics
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 58, 138);
+  doc.text('Summary Statistics', 15, finalY);
+  
+  // Calculate some basic stats
+  const campusCounts = {};
+  const courseCounts = {};
+  const scholarshipCounts = {};
+  
+  exportData.forEach(student => {
+    // Count by campus
+    if (student.campus) {
+      campusCounts[student.campus] = (campusCounts[student.campus] || 0) + 1;
+    }
+    
+    // Count by course
+    if (student.course) {
+      courseCounts[student.course] = (courseCounts[student.course] || 0) + 1;
+    }
+    
+    // Count by scholarship type
+    if (student.student_status) {
+      scholarshipCounts[student.student_status] = (scholarshipCounts[student.student_status] || 0) + 1;
+    }
+  });
+  
+  // Add statistics table if there's room
+  if (finalY < 170) {
     doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text(
-      `Page ${i} of ${pageCount} - BulSU Student Records`,
-      105, 
-      200,
-      { align: 'center' }
-    );
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    
+    doc.text(`Total Students: ${dataCount}`, 15, finalY + 5);
+    
+    // Add top 3 campuses
+    const topCampuses = Object.entries(campusCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+      
+    if (topCampuses.length > 0) {
+      doc.text('Top Campuses:', 15, finalY + 10);
+      topCampuses.forEach((campus, index) => {
+        doc.text(`• ${campus[0]}: ${campus[1]} students (${((campus[1]/dataCount)*100).toFixed(1)}%)`, 20, finalY + 15 + (index * 4));
+      });
+    }
   }
 
-  doc.save(`students_export_${new Date().toISOString()}.pdf`);
+  // Enhanced footer with pagination and timestamp
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    
+    // Add page footer
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    
+    // Bottom line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, 195, 280, 195);
+    
+    // Page number
+    doc.text(`Page ${i} of ${pageCount}`, 15, 199);
+    
+    // Center text
+    doc.text('Bulacan State University - Student Records System', 148, 199, { align: 'center' });
+    
+    // Right aligned timestamp
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 280, 199, { align: 'right' });
+    
+    // Document ID or reference number
+    const docId = `REF-${Math.floor(100000 + Math.random() * 900000)}`;
+    doc.text(`Report ID: ${docId}`, 280, 195, { align: 'right' });
+  }
+
+  // Format timestamp for filename
+  const timestamp = new Date().toISOString()
+    .replace(/T/, '_')
+    .replace(/\..+/, '')
+    .replace(/:/g, '-');
+  
+  // Save the PDF
+  doc.save(`BulSU_student_export_${timestamp}.pdf`);
 };
 
 // Add to onMounted or loadStudents
@@ -843,7 +1079,7 @@ onMounted(() => {
 
           <!-- Multi-select dropdown for Scholarship Type -->
           <div class="filter-dropdown-container relative">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Student Status</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Student's Status</label>
             <button 
               @click.stop="toggleDropdown('scholarshipType')"
               class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
