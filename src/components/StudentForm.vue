@@ -29,7 +29,7 @@ const student = reactive({
   last_sem: '',
   section: '',
   approved: '',
-  scholarship_type: ''
+  scholar_ship: ''
 });
 
 // Constants for form options
@@ -40,7 +40,6 @@ const SATELLITES = [
   { value: 'Meneses Campus', label: 'Meneses Campus' },
   { value: 'Consortium ', label: 'Consortium ' },
   { value: 'Hagonoy Campus', label: 'Hagonoy Campus' },
-  { value: 'Pulilan Campus', label: 'Pulilan Campus' },
   { value: 'San Rafael Campus', label: 'San Rafael Campus' }
 ];
 
@@ -601,6 +600,24 @@ const closeModal = () => {
                 </option>
               </select>
             </div>
+<div>
+              <label for="scholar_ship" class="block text-sm font-medium text-gray-700 mb-1">Scholarship Type</label>
+              <input
+                id="scholar_ship"
+                v-model="student.scholar_ship"
+                type="text"
+                :class="[
+                  'block w-full rounded-md border p-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                  validationErrors.scholar_ship ? 'border-red-500' : 'border-gray-300',
+                ]"
+                placeholder="Enter last name"
+              />
+              <p v-if="validationErrors.scholar_ship" class="mt-1 text-sm text-red-600">
+                {{ validationErrors.scholar_ship }}
+              </p>
+            </div>
+
+
              <div>
               <label for="approved" class="block text-sm font-medium text-gray-700 mb-1">Approval of the Sharing of Student Information</label>
               <select

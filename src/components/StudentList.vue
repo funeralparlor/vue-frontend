@@ -12,6 +12,7 @@ import { ChevronDownIcon, XCircleIcon, CheckIcon } from '@heroicons/vue/24/outli
 
 // Reactive state
 const filterYearLevel = ref([]);
+const filterScholars = ref([]);
 const filterSemester = ref([]);
 const filterCourse = ref([]);
 const filterCampus = ref([]);
@@ -31,6 +32,7 @@ const selectedCountLabels = computed(() => ({
   course: filterCourse.value.length ? `${filterCourse.value.length} selected` : 'All Courses',
   campus: filterCampus.value.length ? `${filterCampus.value.length} selected` : 'All Campuses',
   scholarshipType: filterScholarshipType.value.length ? `${filterScholarshipType.value.length} selected` : 'Student Status',
+  scholar_shiptype: filterScholars.value.length ? `${filterScholars.value.length} selected` : 'Scholarship',
 }));
 
 const students = ref([]);
@@ -130,6 +132,7 @@ const toggleFilter = (filterType, value) => {
     course: filterCourse,
     campus: filterCampus,
     scholarshipType: filterScholarshipType,
+    scholar_shiptype: filterScholars,
   }[filterType];
 
   if (filterRef.value.includes(value)) {
@@ -146,6 +149,7 @@ const removeFilter = (filterType, value) => {
     course: filterCourse,
     campus: filterCampus,
     scholarshipType: filterScholarshipType,
+    scholar_shiptype: filterScholars,
   }[filterType];
 
   filterRef.value = filterRef.value.filter((item) => item !== value);
@@ -157,6 +161,7 @@ const clearFilters = () => {
   filterCourse.value = [];
   filterCampus.value = [];
   filterScholarshipType.value = [];
+  filterScholars.value = [];
   searchQuery.value = '';
   currentPage.value = 1;
   selectedStudents.value = [];
@@ -191,6 +196,7 @@ const filterOptions = computed(() => ({
   course: [...new Set(students.value.map(s => s.course))].sort(),
   campus: [...new Set(students.value.map(s => s.campus))].sort(),
   scholarshipType: [...new Set(students.value.map(s => s.student_status))].sort(),
+  scholar_shiptype: [...new Set(students.value.map(s => s.scholar_ship))].sort(),
 }));
 
 // Using the data returned from the API
@@ -245,6 +251,9 @@ const changeItemsPerPage = (value) => {
       if (filterScholarshipType.value.length > 0) {
         params.student_status = filterScholarshipType.value;
       }
+      if (filterScholars.value.length > 0) {
+        params.scholar_ship = filterScholars.value;
+      }
 
       // Make the API request
       const response = await api.get('/students', { params });
@@ -281,7 +290,7 @@ const changeItemsPerPage = (value) => {
 };
 
 // Watch for changes to filters to reload data
-watch([filterYearLevel, filterSemester, filterCourse, filterCampus, filterScholarshipType, searchQuery], () => {
+watch([filterYearLevel, filterSemester, filterCourse, filterCampus, filterScholarshipType, filterScholars, searchQuery], () => {
   currentPage.value = 1;
   loadStudents();
 });
@@ -299,7 +308,8 @@ const filterRefs = {
   semester: filterSemester,
   course: filterCourse,
   campus: filterCampus,
-  scholarshipType: filterScholarshipType
+  scholarshipType: filterScholarshipType,
+   scholar_shiptype: filterScholars
 };
 
 // Get only the selected students or all if none selected
@@ -333,6 +343,7 @@ const exportToExcel = async () => {
       if (filterCourse.value.length > 0) params.course = filterCourse.value;
       if (filterCampus.value.length > 0) params.campus = filterCampus.value;
       if (filterScholarshipType.value.length > 0) params.student_status = filterScholarshipType.value;
+      if (filterScholars.value.length > 0) params.scholar_ship = filterScholars.value;
       
       const response = await api.get('/students', { params });
       exportData = response.data.data;
@@ -370,7 +381,8 @@ const exportToExcel = async () => {
     'Student_Status': student.student_status,
     'Last sem of enrolment for inactive': student.last_sem,
     'Section': student.section,
-    'Approved to share the information': student.approved
+    'Approved to share the information': student.approved,
+    'Scholarship  Type': student.scholar_ship
   }));
 
   // Create worksheet from data
@@ -472,6 +484,7 @@ const exportToExcel = async () => {
     ["Campus:", filterCampus.value.join(", ") || "All"],
     ["Year Level:", filterYearLevel.value.join(", ") || "All"],
     ["Scholarship Type:", filterScholarshipType.value.join(", ") || "All"],
+    ["Scholarship:", filterScholars.value.join(", ") || "All"],
     ["Search Query:", searchQuery.value || "None"],
     ["Selection:", selectionInfo]
   ];
@@ -526,6 +539,7 @@ const exportToPDF = async () => {
       if (filterCourse.value.length > 0) params.course = filterCourse.value;
       if (filterCampus.value.length > 0) params.campus = filterCampus.value;
       if (filterScholarshipType.value.length > 0) params.student_status = filterScholarshipType.value;
+      if (filterScholars.value.length > 0) params.scholar_ship = filterScholars.value;
       
       const response = await api.get('/students', { params });
       exportData = response.data.data;
@@ -608,6 +622,7 @@ const exportToPDF = async () => {
     filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
     filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
     filterScholarshipType.value.length > 0 && `Scholarship: ${filterScholarshipType.value.join(', ')}`,
+    filterScholars.value.length > 0 && `Scholarship Type: ${filterScholars.value.join(', ')}`,
     searchQuery.value && `Search: "${searchQuery.value}"`
   ].filter(Boolean);
   
@@ -661,7 +676,7 @@ const exportToPDF = async () => {
     student.campus || '-',
     student.student_status || '-',
     student.gender || '-',
-    student.student_status || '-'
+    student.scholar_ship || '-'
   ]);
 
   // Calculate starting Y position based on filters
@@ -1161,10 +1176,60 @@ onMounted(() => {
               </div>
             </div>
           </div>
+
+
+<!-- Multi-select dropdown for Campus -->
+          <div class="filter-dropdown-container relative">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Scholarship</label>
+            <button 
+              @click.stop="toggleDropdown('scholar_shiptype')"
+              class="w-full flex items-center justify-between rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <span class="truncate">{{ selectedCountLabels.scholar_shiptype }}</span>
+              <ChevronDownIcon class="h-4 w-4 text-gray-400" />
+            </button>
+            <div 
+              v-if="dropdownStates.scholar_shiptype"
+              class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-56 rounded-md py-1 ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none text-sm"
+            >
+              <div class="p-2 border-b">
+                <div class="mb-2 text-xs text-gray-500">
+                  {{ filterScholars.length }} of {{ filterOptions.scholar_shiptype.length }} selected
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <div 
+                    v-for="value in filterScholars" 
+                    :key="value"
+                    class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                  >
+                    <span>{{ value }}</span>
+                    <button @click.stop="removeFilter('campus', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                      <XCircleIcon class="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div 
+                v-for="option in filterOptions.scholar_shiptype" 
+                :key="option"
+                @click.stop="toggleFilter('scholar_shiptype', option)"
+                class="px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center"
+              >
+                <div class="h-4 w-4 border rounded mr-2 flex items-center justify-center" :class="filterScholars.includes(option) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'">
+                  <CheckIcon v-if="filterScholars.includes(option)" class="h-3 w-3 text-white" />
+                </div>
+                <span>{{ option }}</span>
+              </div>
+            </div>
+          </div>
+
+
+
+
         </div>
 
         <!-- Active filter tags -->
-        <div v-if="filterYearLevel.length || filterSemester.length || filterCourse.length || filterCampus.length || filterScholarshipType.length" class="mt-4">
+        <div v-if="filterYearLevel.length || filterSemester.length || filterCourse.length || filterCampus.length || filterScholarshipType.length || filterScholars.length" class="mt-4">
           <h3 class="text-sm font-medium text-gray-700 mb-2">Active Filters:</h3>
           <div class="flex flex-wrap gap-2">
             <div 
@@ -1212,8 +1277,19 @@ onMounted(() => {
               :key="`schol-${value}`"
               class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
             >
-              <span>Scholarship: {{ value }}</span>
+              <span>Status: {{ value }}</span>
               <button @click="removeFilter('scholarshipType', value)" class="ml-1 text-blue-600 hover:text-blue-800">
+                <XCircleIcon class="h-3 w-3" />
+              </button>
+            </div>
+
+             <div 
+              v-for="value in filterScholars" 
+              :key="`scholar-${value}`"
+              class="flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+            >
+              <span>Scholarship Type: {{ value }}</span>
+              <button @click="removeFilter('scholar_shiptype', value)" class="ml-1 text-blue-600 hover:text-blue-800">
                 <XCircleIcon class="h-3 w-3" />
               </button>
             </div>
@@ -1266,7 +1342,7 @@ onMounted(() => {
                 </th>
                 <th v-for="header in [
                   'Student ID', 'Last Name', 'First Name', 'Middle Name',
-                  'Course', 'College', 'Campus', 'Year Level', 'Gender', 'Student Status'
+                  'Course', 'College', 'Campus', 'Year Level', 'Gender', 'Student Status', 'Scholarship'
                 ]" :key="header" class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   {{ header }}
                 </th>
@@ -1318,6 +1394,9 @@ onMounted(() => {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                   {{ student.student_status }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {{ student.scholar_ship }}
                 </td>
                 
               </tr>

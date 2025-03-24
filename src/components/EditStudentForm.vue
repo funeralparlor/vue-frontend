@@ -59,6 +59,7 @@ const fieldDefinitions = {
       ]
     },
     { key: 'last_sem', label: 'Last Semester', type: 'text', required: true },
+    { key: 'scholar_ship', label: 'Scholarship', type: 'text', required: true },
   ],
   contactInfo: [
     { key: 'comp_address', label: 'Complete Address', type: 'text', required: false },

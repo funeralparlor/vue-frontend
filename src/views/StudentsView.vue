@@ -536,6 +536,7 @@ onUnmounted(() => {
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Year Level</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Gender</th>
               <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Student Status</th>
+              <th class="px-6 py-3.5 text-left text-sm font-semibold text-gray-900">Scholarship</th>
               <th class="px-6 py-3.5 text-right text-sm font-semibold text-gray-900">Actions</th>
             </tr>
           </thead>
@@ -560,6 +561,7 @@ onUnmounted(() => {
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.year_level }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.gender }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.student_status }}</td>
+                <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{{ student.scholar_ship }}</td>
                 <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <button @click="editStudent(student.id)" class="text-blue-600 hover:text-blue-900 mr-4">
                     View Student
