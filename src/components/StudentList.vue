@@ -660,6 +660,7 @@ const exportToPDF = async () => {
     'College',
     'Course',
     'Campus',
+    'Year Level',
     'Student Status',
     'Student Gender',
     'Scholarship',
@@ -674,6 +675,7 @@ const exportToPDF = async () => {
     student.college || '-',
     student.course || '-',
     student.campus || '-',
+    student.year_level || '-',
     student.student_status || '-',
     student.gender || '-',
     student.scholar_ship || '-'
@@ -710,17 +712,19 @@ const exportToPDF = async () => {
       fillColor: [245, 247, 250] // Light blue-gray for better readability
     },
     // Improved column widths based on content
-    columnStyles: {
-  0: { cellWidth: 20, halign: 'center' },  // Student ID
-  1: { cellWidth: 25 },                   // Last Name
-  2: { cellWidth: 25 },                   // First Name
-  3: { cellWidth: 20 },                   // Middle Name
-  4: { cellWidth: 25, halign: 'center' }, // College
-  5: { cellWidth: 46 },                   // Course (wider for longer names)
-  6: { cellWidth: 25 },                   // Campus
-  7: { cellWidth: 30 },                   // Student Status
-  8: { cellWidth: 20, halign: 'center' }, // Student Gender
-  9: { cellWidth: 31 }                    // Scholarship
+   columnStyles: {
+  0: { cellWidth: 18, halign: 'center' },  // Student ID (slightly narrower)
+  1: { cellWidth: 22 },                   // Last Name (slightly narrower)
+  2: { cellWidth: 22 },                   // First Name (slightly narrower)
+  3: { cellWidth: 18 },                   // Middle Name (slightly narrower)
+  4: { cellWidth: 22, halign: 'center' }, // College (slightly narrower)
+  5: { cellWidth: 40 },                   // Course (wider for longer names)
+  6: { cellWidth: 22 },                   // Campus (slightly narrower)
+  7: { cellWidth: 18, halign: 'center' }, // Year Level (new column)
+  8: { cellWidth: 25 },                   // Student Status (slightly narrower)
+  9: { cellWidth: 18, halign: 'center' }, // Student Gender (slightly narrower)
+  10: { cellWidth: 25 },                   // Scholarship (slightly narrower)
+  
 },
     margin: { left: 15, right: 15 },
     didDrawPage: (data) => {
