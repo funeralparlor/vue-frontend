@@ -38,7 +38,7 @@ const error = ref(null);
 const isLoading = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
-const itemsPerPage = ref(10000);
+const itemsPerPage = ref(10);
 const totalStudents = ref(0);
 const totalPages = ref(1);
 const selectedStudents = ref([]);
@@ -171,6 +171,17 @@ const user = {
   imageUrl: 'https://upload.wikimedia.org/wikipedia/en/7/7e/Bulacan_State_University_logo.png',
 };
 
+// Fetch user data on component mount
+onMounted(async () => {
+  try {
+    const response = await api.get('/user');
+    user.name = response.data.name;
+    user.email = response.data.email;
+  } catch (error) {
+    console.error('Failed to fetch user data:', error);
+    alert('Failed to load user information. Please try again.');
+  }
+});
 
 
 // Computed properties
@@ -631,10 +642,12 @@ const exportToPDF = async () => {
     'Last Name',
     'First Name',
     'Middle Name',
-    'Semester',
+    'College',
     'Course',
     'Campus',
-    'Student Status'
+    'Student Status',
+    'Student Gender',
+    'Scholarship',
   ];
 
   // Transform data for the table with proper field mapping
@@ -646,6 +659,8 @@ const exportToPDF = async () => {
     student.college || '-',
     student.course || '-',
     student.campus || '-',
+    student.student_status || '-',
+    student.gender || '-',
     student.student_status || '-'
   ]);
 
@@ -681,15 +696,17 @@ const exportToPDF = async () => {
     },
     // Improved column widths based on content
     columnStyles: {
-      0: { cellWidth: 25, halign: 'center' }, // Student ID
-      1: { cellWidth: 30 }, // Last Name
-      2: { cellWidth: 30 }, // First Name
-      3: { cellWidth: 25 }, // Middle Name
-      4: { cellWidth: 20, halign: 'center' }, // Semester
-      5: { cellWidth: 40 }, // Course
-      6: { cellWidth: 35 }, // Campus
-      7: { cellWidth: 35 } // Scholarship Type
-    },
+  0: { cellWidth: 20, halign: 'center' },  // Student ID
+  1: { cellWidth: 25 },                   // Last Name
+  2: { cellWidth: 25 },                   // First Name
+  3: { cellWidth: 20 },                   // Middle Name
+  4: { cellWidth: 25, halign: 'center' }, // College
+  5: { cellWidth: 46 },                   // Course (wider for longer names)
+  6: { cellWidth: 25 },                   // Campus
+  7: { cellWidth: 30 },                   // Student Status
+  8: { cellWidth: 20, halign: 'center' }, // Student Gender
+  9: { cellWidth: 31 }                    // Scholarship
+},
     margin: { left: 15, right: 15 },
     didDrawPage: (data) => {
       // Add header to each page

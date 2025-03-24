@@ -58,8 +58,14 @@ const router = createRouter({
       path: '/settings',
       name: 'settings',
       component: UserSettings,
-      meta: { requiresAuth: true } // Assuming you have auth middleware
+      meta: { requiresAuth: true } 
     },
+
+    {
+      path: '/trashbin',
+      component: () => import('@/components/TrashBin.vue'),
+      meta: { requiresAuth: true }
+  }
   ],
 });
 

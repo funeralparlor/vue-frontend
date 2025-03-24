@@ -53,6 +53,7 @@ const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: 'Home' },
   { name: 'Add Student', href: '/home', icon: 'Users' },
   { name: 'Student List', href: '/list', icon: 'Folder' },
+    { name: 'Trash Bin', href: '/trashbin', icon: 'Folder' },
   { name: '', href: '#', icon: 'Calendar' },
   { name: '', href: '#', icon: 'ChartBar' },
 ];
