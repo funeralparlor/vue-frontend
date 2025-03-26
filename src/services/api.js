@@ -1,7 +1,8 @@
 
 import axios from 'axios';
+import { useRouter } from 'vue-router';
 
-
+const router = useRouter();
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'https://laravel-backend-4jkn.onrender.com/api',
@@ -36,6 +37,24 @@ api.interceptors.response.use(
     }
 );
 
+// Response interceptor to handle 401
+api.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response?.status === 401) {
+            const logoutReason = error.response.data?.logout_reason;
+            
+            if (logoutReason === 'inactivity') {
+                // Show specific message for inactivity logout
+                alert('Your session has expired due to inactivity. Please login again.');
+            }
+            
+            localStorage.removeItem('token');
+            router.push({ name: 'login' });
+        }
+        return Promise.reject(error);
+    }
+);
 
 
 export default api;

@@ -1,10 +1,14 @@
 <script>
-import { RouterView } from 'vue-router'
-import { ref } from 'vue';
+import { RouterView, useRouter } from 'vue-router'
+import { ref, watch } from 'vue';
 import api from '@/services/api'; // Import your Axios instance
-import { setupInactivityTimer } from '@/utils/inactivityTracker';
+import useInactivityTimer from '@/composables/useInactivityTimer';
+
+
+
 
 export default {
+  
   setup() {
     // Reactive data
     const courses = ref([]);
@@ -57,22 +61,88 @@ export default {
       fetchCourses,
     };
   },
-
-  mounted() {
-    if (localStorage.getItem('token')) {
-      setupInactivityTimer(() => {
-        this.$store.dispatch('logout'); // Dispatch your logout action
-        this.$router.push({ name: 'login' });
-      }, 15); // 15 minutes of inactivity
-    }
-  },
 };
+
+
+const router = useRouter();
+const showSessionWarning = ref(false);
+const logoutCountdown = ref(0);
+
+const logout = () => {
+    localStorage.removeItem('token');
+    router.push({ name: 'login' });
+};
+
+const handleWarning = (seconds) => {
+    logoutCountdown.value = seconds;
+    showSessionWarning.value = true;
+};
+
+let inactivityTimer;
+
+watch(
+    () => localStorage.getItem('token'),
+    (token) => {
+        if (token) {
+            inactivityTimer = useInactivityTimer(
+                logout,
+                handleWarning,
+                { 
+                    timeoutMinutes: 25, 
+                    warningMinutes: 5 
+                }
+            );
+        } else if (inactivityTimer) {
+            // Cleanup if logged out
+            inactivityTimer = null;
+        }
+    },
+    { immediate: true }
+);
+
+
+
+
+
 </script>
 
 <template>
+
+   <div v-if="showSessionWarning" class="session-warning-overlay">
+        <div class="session-warning-modal">
+            <h3>Session Timeout Warning</h3>
+            <p>Your session will expire in {{ logoutCountdown }} seconds due to inactivity.</p>
+            <button @click="() => {
+                showSessionWarning = false;
+                // Any activity will automatically reset the timer
+            }">
+                Continue Session
+            </button>
+        </div>
+    </div>
+    
   <RouterView /> <!-- This renders your current route component -->
 </template>
 
-<style>
-/* Add global styles here if needed */
+<style scoped>
+.session-warning-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.session-warning-modal {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 400px;
+    text-align: center;
+}
 </style>
