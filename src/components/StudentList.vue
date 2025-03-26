@@ -483,7 +483,7 @@ const exportToExcel = async () => {
     ["Course:", filterCourse.value.join(", ") || "All"],
     ["Campus:", filterCampus.value.join(", ") || "All"],
     ["Year Level:", filterYearLevel.value.join(", ") || "All"],
-    ["Scholarship Type:", filterScholarshipType.value.join(", ") || "All"],
+    ["Student Status:", filterScholarshipType.value.join(", ") || "All"],
     ["Scholarship:", filterScholars.value.join(", ") || "All"],
     ["Search Query:", searchQuery.value || "None"],
     ["Selection:", selectionInfo]
@@ -567,7 +567,7 @@ const exportToPDF = async () => {
   // Add university logo
   const logo = new Image();
   logo.src = user.imageUrl;
-  doc.addImage(logo, 'PNG', 15, 10, 20, 20);
+  doc.addImage(logo, 'PNG', 15, 5, 20, 20);
 
   // Improved header styling
   doc.setFontSize(18);
@@ -621,7 +621,7 @@ const exportToPDF = async () => {
     filterSemester.value.length > 0 && `Semester: ${filterSemester.value.join(', ')}`,
     filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
     filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
-    filterScholarshipType.value.length > 0 && `Scholarship: ${filterScholarshipType.value.join(', ')}`,
+    filterScholarshipType.value.length > 0 && `Student Status: ${filterScholarshipType.value.join(', ')}`,
     filterScholars.value.length > 0 && `Scholarship Type: ${filterScholars.value.join(', ')}`,
     searchQuery.value && `Search: "${searchQuery.value}"`
   ].filter(Boolean);

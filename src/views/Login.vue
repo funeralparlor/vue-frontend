@@ -6,15 +6,6 @@
         <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
           Sign in to your account
         </h2>
-        <p class="mt-2 text-sm text-gray-600">
-          Or
-          <router-link 
-            :to="{ name: 'register' }" 
-            class="font-medium text-blue-600 hover:text-blue-500"
-          >
-            create a new account
-          </router-link>
-        </p>
       </div>
 
       <form @submit.prevent="handleLogin" class="mt-8 space-y-6">
@@ -64,11 +55,6 @@
             </label>
           </div>
 
-          <div class="text-sm">
-            <a href="#" class="font-medium text-blue-600 hover:text-blue-500">
-              Forgot your password?
-            </a>
-          </div>
         </div>
 
         <div>

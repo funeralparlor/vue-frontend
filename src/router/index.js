@@ -3,7 +3,6 @@ import StudentsView from '@/views/StudentsView.vue';
 import StudentList from '@/components/StudentList.vue';
 import Dashboard from '@/components/Dashboard.vue';
 import Login from '@/views/Login.vue'; // Add missing import
-import Register from '@/views/Register.vue';
 import Landing from '@/views/landing.vue';
 import UserSettings from '@/components/UserSettings.vue';
 
@@ -22,12 +21,6 @@ const router = createRouter({
       name: 'login',
       component: Login,
       meta: { requiresGuest: true } // New meta field
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: Register,
-      meta: { requiresGuest: true }
     },
     {
       path: '/students',

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import api from '../services/api';
 
+
 // Import all chart components
 import EnhancedChart from '@/components/EnhancedChart.vue';
 import BarChart from '@/components/BarChart.vue';
@@ -9,6 +10,8 @@ import LineChart from '@/components/LineChart.vue';
 import GaugeChart from '@/components/GaugeChart.vue';
 import MixedChart from '@/components/MixedChart.vue';
 import MainLayout from '@/components/MainLayout.vue';
+
+
 
 export default {
   name: 'StudentDashboardController',
@@ -34,7 +37,7 @@ export default {
       gender_distribution: [],
       year_level_distribution: [],
       approval_status: [],
-      enrollment_trend: {
+      student_scholarship: {
         undergraduate: [],
         graduate: []
       }
@@ -105,7 +108,7 @@ export default {
     const formatEnrollmentTrends = computed(() => {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       
-      if (!dashboardData.value.enrollment_trend) {
+      if (!dashboardData.value.student_scholarship) {
         return {
           labels: months,
           datasets: [
@@ -129,8 +132,8 @@ export default {
       }
       
       // Calculate total enrollment and growth
-      const undergrad = dashboardData.value.enrollment_trend.undergraduate || [];
-      const grad = dashboardData.value.enrollment_trend.graduate || [];
+      const undergrad = dashboardData.value.student_scholarship.undergraduate || [];
+      const grad = dashboardData.value.student_scholarship.graduate || [];
       const total = undergrad.map((val, i) => val + (grad[i] || 0));
       
       // Calculate growth percentage (month to month)
@@ -220,15 +223,15 @@ export default {
       ],
       yearOptions: [
         { value: 'all', label: 'All Years' },
-        { value: 'freshman', label: 'Freshman' },
-        { value: 'sophomore', label: 'Sophomore' },
-        { value: 'junior', label: 'Junior' },
-        { value: 'senior', label: 'Senior' },
-        { value: 'graduate', label: 'Graduate' }
+        { value: '1st Year', label: '1st Year' },
+        { value: '2nd Year', label: '2nd Year' },
+        { value: '3rd Year', label: '3rd Year' },
+        { value: '4th Year', label: '4th Year' }
       ]
     };
   }
 };
+
 </script>
 
 <template>
@@ -239,32 +242,7 @@ export default {
         <h1 class="dashboard-title">Student Analytics Dashboard</h1>
         
         <div class="dashboard-filters">
-          <div class="filter-group">
-            <label for="timeframe">Timeframe:</label>
-            <select id="timeframe" v-model="timeframe" @change="applyFilters">
-              <option v-for="option in timeframeOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
           
-          <div class="filter-group">
-            <label for="college">College:</label>
-            <select id="college" v-model="filterCollege" @change="applyFilters">
-              <option v-for="option in collegeOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label for="year">Year Level:</label>
-            <select id="year" v-model="filterYear" @change="applyFilters">
-              <option v-for="option in yearOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
           
           <button class="refresh-btn" @click="fetchDashboardData">
             <span>↻</span> Refresh
