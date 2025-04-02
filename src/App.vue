@@ -2,7 +2,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { ref, watch } from 'vue';
 import api from '@/services/api'; // Import your Axios instance
-import useInactivityTimer from '@/composables/useInactivityTimer';
+
 
 
 
@@ -80,25 +80,7 @@ const handleWarning = (seconds) => {
 
 let inactivityTimer;
 
-watch(
-    () => localStorage.getItem('token'),
-    (token) => {
-        if (token) {
-            inactivityTimer = useInactivityTimer(
-                logout,
-                handleWarning,
-                { 
-                    timeoutMinutes: 25, 
-                    warningMinutes: 5 
-                }
-            );
-        } else if (inactivityTimer) {
-            // Cleanup if logged out
-            inactivityTimer = null;
-        }
-    },
-    { immediate: true }
-);
+
 
 
 
@@ -145,4 +127,4 @@ watch(
     max-width: 400px;
     text-align: center;
 }
-</style>
+</style>@/composables/useInactivityTracker

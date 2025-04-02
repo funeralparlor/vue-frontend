@@ -1,9 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue';
 import { Bars3Icon, XMarkIcon } from '@heroicons/vue/24/outline';
 import api from '@/services/api';
+
+// Import our inactivity tracker
+import useInactivityTracker from '@/composables/useInactivityTracker';
 
 // Props to receive page title
 const props = defineProps({
@@ -17,6 +20,56 @@ const props = defineProps({
 const route = useRoute();
 const router = useRouter();
 
+// Inactivity tracker setup
+const showWarning = ref(false);
+const warningTimer = ref(null);
+const remainingTime = ref(60); // 60 seconds for warning countdown
+const countdownInterval = ref(null);
+
+// Configure inactivity tracker with 15 minutes timeout
+const { isActive, resetTimer } = useInactivityTracker({
+  timeout: 15 * 60 * 1000, // 15 minutes
+  onLogout: () => {
+    showWarning.value = false;
+    if (countdownInterval.value) clearInterval(countdownInterval.value);
+  }
+});
+
+// Clean up timers function
+const cleanupTimers = () => {
+  if (warningTimer.value) clearTimeout(warningTimer.value);
+  if (countdownInterval.value) clearInterval(countdownInterval.value);
+};
+
+// Start countdown timer when warning appears
+const startCountdown = () => {
+  remainingTime.value = 60;
+  if (countdownInterval.value) clearInterval(countdownInterval.value);
+  
+  countdownInterval.value = setInterval(() => {
+    remainingTime.value -= 1;
+    if (remainingTime.value <= 0) {
+      clearInterval(countdownInterval.value);
+    }
+  }, 1000);
+};
+
+// Continue session function
+const continueSession = () => {
+  resetTimer();
+  showWarning.value = false;
+  
+  // Clear intervals and timers
+  if (countdownInterval.value) clearInterval(countdownInterval.value);
+  if (warningTimer.value) clearTimeout(warningTimer.value);
+  
+  // Reset the warning timer
+  warningTimer.value = setTimeout(() => {
+    showWarning.value = true;
+    startCountdown();
+  }, 14 * 60 * 1000);
+};
+
 // Logout function
 const logout = async () => {
   try {
@@ -26,6 +79,9 @@ const logout = async () => {
   } catch (error) {
     console.error('Logout failed:', error);
     alert('Logout failed. Please try again.');
+  } finally {
+    // Clear all timers
+    cleanupTimers();
   }
 };
 
@@ -36,24 +92,12 @@ const user = ref({
   imageUrl: 'https://upload.wikimedia.org/wikipedia/en/7/7e/Bulacan_State_University_logo.png',
 });
 
-// Fetch user data when component mounts
-onMounted(async () => {
-  try {
-    const response = await api.get('/user');
-    user.value.name = response.data.name;
-    user.value.email = response.data.email;
-    user.value.imageUrl = response.data.profile_image || 'https://upload.wikimedia.org/wikipedia/en/7/7e/Bulacan_State_University_logo.png';
-  } catch (error) {
-    console.error('Failed to fetch user data:', error);
-  }
-});
-
 // Navigation items
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: 'Home' },
   { name: 'Add Student', href: '/home', icon: 'Users' },
   { name: 'Student List', href: '/list', icon: 'Folder' },
-    { name: 'Trash Bin', href: '/trashbin', icon: 'Folder' },
+  { name: 'Trash Bin', href: '/trashbin', icon: 'Folder' },
   { name: '', href: '#', icon: 'Calendar' },
   { name: '', href: '#', icon: 'ChartBar' },
 ];
@@ -71,6 +115,36 @@ const userNavigation = [
   { name: 'Settings', href: '/settings' },
   { name: 'Sign out', action: logout }, // Add logout action
 ];
+
+// Combine all initialization and cleanup in single lifecycle hooks
+onMounted(async () => {
+  // Set up session timeout warning
+  if (localStorage.getItem('token')) {
+    warningTimer.value = setTimeout(() => {
+      showWarning.value = true;
+      startCountdown();
+    }, 14 * 60 * 1000); // 14 minutes (1 minute before timeout)
+  }
+  
+  // Add beforeunload event listener
+  window.addEventListener('beforeunload', cleanupTimers);
+  
+  // Fetch user data
+  try {
+    const response = await api.get('/user');
+    user.value.name = response.data.name;
+    user.value.email = response.data.email;
+    user.value.imageUrl = response.data.profile_image || 'https://upload.wikimedia.org/wikipedia/en/7/7e/Bulacan_State_University_logo.png';
+  } catch (error) {
+    console.error('Failed to fetch user data:', error);
+  }
+});
+
+// Handle component unmount cleanup
+onUnmounted(() => {
+  cleanupTimers();
+  window.removeEventListener('beforeunload', cleanupTimers);
+});
 </script>
 
 <template>
@@ -172,5 +246,30 @@ const userNavigation = [
         <slot></slot>
       </div>
     </main>
+
+    <!-- Inactivity warning modal -->
+    <div v-if="showWarning" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+        <h3 class="text-xl font-bold mb-4">Session Timeout Warning</h3>
+        <p class="mb-4">
+          Your session is about to expire due to inactivity. You will be automatically logged out in 
+          <span class="font-semibold text-red-600">{{ remainingTime }}</span> seconds.
+        </p>
+        <div class="flex justify-end space-x-3">
+          <button 
+            @click="logout"
+            class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+          >
+            Logout now
+          </button>
+          <button 
+            @click="continueSession"
+            class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Continue session
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

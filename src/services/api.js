@@ -50,7 +50,7 @@ api.interceptors.response.use(
             }
             
             localStorage.removeItem('token');
-            router.push({ name: 'login' });
+            router.push({ name: '/login' });
         }
         return Promise.reject(error);
     }
