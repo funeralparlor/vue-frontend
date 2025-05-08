@@ -40,6 +40,10 @@ const loadOptionCounts = async () => {
     optionCounts.value.scholarships.total = scholarshipsResponse.data.total;
     optionCounts.value.scholarships.active = scholarshipsResponse.data.data.filter(s => s.active).length;
 
+// Load scholarship counts - we need to implement summary endpoints
+    const yearlevelsResponse = await YearLevelService.getAll();
+    optionCounts.value.year_levels.total = yearlevelsResponse.data.total;
+    optionCounts.value.year_levels.active = yearlevelsResponse.data.data.filter(s => s.active).length;
   
 
     // Load campus counts - we need to implement summary endpoints
@@ -234,7 +238,7 @@ onMounted(() => {
         <div>
           <h2 class="text-xl font-semibold text-gray-900">College Management</h2>
           <p class="text-sm text-gray-500 mt-1">
-            Manage academic colleges and departments
+            Manage academic colleges and courses
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -375,7 +379,7 @@ onMounted(() => {
         <div>
           <h2 class="text-xl font-semibold text-gray-900">Campus Management</h2>
           <p class="text-sm text-gray-500 mt-1">
-            Manage academic programs and campuses
+            Manage academic campuses
           </p>
         </div>
         <div class="flex flex-wrap gap-2">

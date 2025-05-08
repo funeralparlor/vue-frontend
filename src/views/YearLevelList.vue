@@ -193,7 +193,7 @@ onMounted(() => loadYearLevels());
 </script>
 
 <template>
-  <MainLayout pageTitle="YearLevels">
+  <MainLayout pageTitle="Year Levels">
     <div class="max-w-6xl mx-auto p-6 bg-white rounded-lg shadow">
       <!-- Header section -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
