@@ -480,6 +480,7 @@ const exportToExcel = async () => {
   const infoData = [
     ["Export Date:", new Date().toLocaleString()],
     ["Filters Applied:", ""],
+    ["College:", filterSemester.value.join(", ") || "All"],
     ["Course:", filterCourse.value.join(", ") || "All"],
     ["Campus:", filterCampus.value.join(", ") || "All"],
     ["Year Level:", filterYearLevel.value.join(", ") || "All"],
@@ -618,7 +619,7 @@ const exportToPDF = async () => {
   // Create a more structured filter display
   const filterItems = [
     filterYearLevel.value.length > 0 && `Year Level: ${filterYearLevel.value.join(', ')}`,
-    filterSemester.value.length > 0 && `Semester: ${filterSemester.value.join(', ')}`,
+    filterSemester.value.length > 0 && `College: ${filterSemester.value.join(', ')}`,
     filterCourse.value.length > 0 && `Course: ${filterCourse.value.join(', ')}`,
     filterCampus.value.length > 0 && `Campus: ${filterCampus.value.join(', ')}`,
     filterScholarshipType.value.length > 0 && `Student Status: ${filterScholarshipType.value.join(', ')}`,

@@ -43,7 +43,7 @@ const fieldDefinitions = {
     { key: 'college', label: 'College Faculty', type: 'text', required: true },
     { key: 'course', label: 'College Course', type: 'text', required: true },
     { key: 'campus', label: 'Campus', type: 'text', required: true },
-    { key: 'year_level', label: 'Year Level', type: 'text', required: true },
+    { key: 'year_level', label: 'Year Level', type: 'select', required: true },
     { key: 'section', label: 'Section', type: 'text', required: true },
     { key: 'student_status', label: 'Student Status', type: 'select', required: true,
       options: [
