@@ -441,7 +441,7 @@ onMounted(() => {
         <div class="flex flex-wrap gap-2">
           
           <button 
-            @click="navigateTo('/year_levels/trash')"
+            @click="navigateTo('/yearlevels/trash')"
             class="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200 transition-all flex items-center gap-2"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,7 +471,7 @@ onMounted(() => {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button 
-          @click="navigateTo('/year_levels')"
+          @click="navigateTo('/yearlevels')"
           class="p-4 border border-gray-200 hover:border-blue-200 rounded-xl transition-all hover:bg-blue-50 group"
         >
           <div class="flex items-center gap-3">

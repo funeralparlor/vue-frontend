@@ -43,14 +43,7 @@ const fieldDefinitions = {
     { key: 'college', label: 'College Faculty', type: 'text', required: true },
     { key: 'course', label: 'College Course', type: 'text', required: true },
     { key: 'campus', label: 'Campus', type: 'text', required: true },
-    { key: 'year_level', label: 'Year Level', type: 'select', required: true,
-      options: [
-        { value: '1st Year', label: '1st Year' },
-        { value: '2nd Year', label: '2nd Year' },
-        { value: '3rd Year', label: '3rd Year' },
-        { value: '4th Year', label: '4th Year' }
-      ]
-    },
+    { key: 'year_level', label: 'Year Level', type: 'text', required: true },
     { key: 'section', label: 'Section', type: 'text', required: true },
     { key: 'student_status', label: 'Student Status', type: 'select', required: true,
       options: [
