@@ -382,7 +382,7 @@ const exportToExcel = async () => {
     'Last sem of enrolment for inactive': student.last_sem || '-',
     'Section': student.section,
     'Approved to share the information': student.approved,
-    'Scholarship  Type': student.scholar_ship
+    'Scholarship Type': student.scholar_ship
   }));
 
   // Create worksheet from data
